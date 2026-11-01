@@ -37,6 +37,18 @@ final class Cards {
         return t;
     }
 
+    /**
+     * Softens a large name's letters: Outfit ends its curves (the tips of S, J, C) in sharp straight cuts that read as
+     * clipped at display size. A thin outline drawn with round joins rounds every corner off.
+     */
+    static void softCorners(TextView t, float s) {
+        android.graphics.Paint p = t.getPaint();
+        p.setStyle(android.graphics.Paint.Style.FILL_AND_STROKE);
+        p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+        p.setStrokeWidth(d(s, 4));
+        t.invalidate();
+    }
+
     /** A card for an app: its icon, large, on a deep tint of the icon's own colour. The name shows above the grid. */
     static FrameLayout app(Context c, float s, Apps.App a) {
         ImageView icon = new ImageView(c);

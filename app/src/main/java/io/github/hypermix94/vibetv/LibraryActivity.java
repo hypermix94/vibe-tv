@@ -284,7 +284,8 @@ public class LibraryActivity extends Activity {
             }
         }
         name = Cards.text(this, s, 72, R.font.outfit_medium, Color.WHITE);
-        name.setTypeface(android.graphics.Typeface.create(getResources().getFont(R.font.outfit_medium), 600, false));
+        name.setTypeface(android.graphics.Typeface.create(getResources().getFont(R.font.outfit_medium), 560, false));
+        Cards.softCorners(name, s);
         name.setLetterSpacing(-0.03f);
         name.setSingleLine(true);
         name.setText(words);

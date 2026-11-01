@@ -636,6 +636,7 @@ public class HomeActivity extends Activity {
         heading.setLetterSpacing(-0.02f);
         heading.setSingleLine(true);
         heading.setText(words);
+        Cards.softCorners(heading, s);
         heading.forceHasOverlappingRendering(false);
         heading.setPadding(d(24) + d(12), 0, 0, 0);   // room for round first letters inside the box
         heading.setTranslationX(-d(24) - d(12));
@@ -678,7 +679,8 @@ public class HomeActivity extends Activity {
         card.setPadding(d(24), 0, 0, 0);
         card.setTranslationX(-d(24));
         heroTitle = text(168, R.font.outfit_medium, Color.WHITE);
-        heroTitle.setTypeface(Typeface.create(getResources().getFont(R.font.outfit_medium), 600, false));
+        heroTitle.setTypeface(Typeface.create(getResources().getFont(R.font.outfit_medium), 560, false));
+        Cards.softCorners(heroTitle, s);
         heroTitle.setLetterSpacing(-0.045f);
         heroTitle.setText(a.label);
         heroTitle.setSingleLine(true);
@@ -702,7 +704,13 @@ public class HomeActivity extends Activity {
         }
     }
 
+    /**
+     * The line under the big name: what the app last played, as its media session reported it ("Last played
+     * <b>title</b>"); for an app that never says (often the case), when it was last opened.
+     */
     private String lastOpened(String pkg) {
+        String title = NowPlaying.loadTitle(this, pkg);
+        if (!title.isEmpty()) return "Last played <b>" + android.text.TextUtils.htmlEncode(title) + "</b>";
         long at = prefs().getLong("opened_" + pkg, 0);
         if (at == 0) return "Press OK to open";
         Calendar then = Calendar.getInstance(), now = Calendar.getInstance();
