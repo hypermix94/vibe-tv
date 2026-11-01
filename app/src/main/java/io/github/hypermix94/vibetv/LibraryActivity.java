@@ -288,6 +288,9 @@ public class LibraryActivity extends Activity {
         name.setLetterSpacing(-0.03f);
         name.setSingleLine(true);
         name.setText(words);
+        name.forceHasOverlappingRendering(false);   // no off-screen layer to cut a round first letter mid-fade
+        name.setPadding(d(24), 0, 0, 0);
+        name.setTranslationX(-d(24));
         nameBox.addView(name, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM | Gravity.START));
         if (animate) {
             name.setTranslationY(d(24));

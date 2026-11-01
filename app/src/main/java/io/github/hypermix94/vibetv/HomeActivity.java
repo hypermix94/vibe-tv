@@ -635,6 +635,9 @@ public class HomeActivity extends Activity {
         heading.setLetterSpacing(-0.02f);
         heading.setSingleLine(true);
         heading.setText(words);
+        heading.forceHasOverlappingRendering(false);
+        heading.setPadding(d(24), 0, 0, 0);
+        heading.setTranslationX(-d(24));
         headingBox.addView(heading, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM | Gravity.START));
         if (animate) {
             heading.setTranslationY(d(20));
@@ -668,6 +671,11 @@ public class HomeActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setClipChildren(false);   // round letters like S reach a little past the edge: never cut them
+        // Fade the words directly, not through an off-screen layer the size of the box: such a layer would cut the
+        // overhang of an S while the name glides in, and it would pop back once the fade ended.
+        card.forceHasOverlappingRendering(false);
+        card.setPadding(d(24), 0, 0, 0);
+        card.setTranslationX(-d(24));
         heroTitle = text(168, R.font.outfit_medium, Color.WHITE);
         heroTitle.setTypeface(Typeface.create(getResources().getFont(R.font.outfit_medium), 600, false));
         heroTitle.setLetterSpacing(-0.045f);
@@ -680,6 +688,8 @@ public class HomeActivity extends Activity {
         lineLp.topMargin = d(10);
         card.addView(heroTitle, new LinearLayout.LayoutParams(-1, -2));
         card.addView(heroLine, lineLp);
+        heroTitle.forceHasOverlappingRendering(false);
+        heroLine.forceHasOverlappingRendering(false);
         heroBox.addView(card, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM | Gravity.START));
         if (!instant) {
             card.setTranslationY(d(28));
