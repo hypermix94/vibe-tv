@@ -54,7 +54,10 @@ final class DailyWallpaper {
             jpg = all[all.length - 1];
             txt = new File(jpg.getPath().replace(".jpg", ".txt"));
         }
-        Bitmap b = BitmapFactory.decodeFile(jpg.getPath());
+        // A photo has no transparency: RGB_565 holds it in half the memory of the default, with no visible loss on a TV.
+        BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inPreferredConfig = Bitmap.Config.RGB_565;
+        Bitmap b = BitmapFactory.decodeFile(jpg.getPath(), o);
         return b != null ? new Picture(b, read(txt)) : null;
     }
 
