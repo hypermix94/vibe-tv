@@ -40,6 +40,7 @@ public class LibraryActivity extends Activity {
     private boolean longPressed;
     private FrameLayout nameBox;
     private TextView name;
+    private ScrollBar scroll;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -73,11 +74,12 @@ public class LibraryActivity extends Activity {
         column.setOrientation(LinearLayout.VERTICAL);
         column.setClipChildren(false);
         TextView title = Cards.text(this, s, 30, R.font.outfit_regular, 0xB8FFFFFF);
-        title.setText("All apps \u00b7 hold OK to choose where an app goes");
+        title.setText("All apps");
         column.addView(title);
         nameBox = new FrameLayout(this);
         nameBox.setClipChildren(false);
-        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(-1, d(90));
+        // Tall enough for the big name and the room around it on every side, so no letter is cut.
+        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(-1, d(118));
         nameLp.topMargin = d(10);
         column.addView(nameBox, nameLp);
 
@@ -114,6 +116,10 @@ public class LibraryActivity extends Activity {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
         lp.setMargins(d(112), d(96), d(112), 0);
         root.addView(column, lp);
+        scroll = new ScrollBar(this, s);   // on the right: where in the apps the remote is
+        FrameLayout.LayoutParams barLp = new FrameLayout.LayoutParams(d(20), -1, Gravity.END);
+        barLp.setMargins(0, d(270), d(48), d(80));
+        root.addView(scroll, barLp);
         column.setAlpha(0f);
         column.setTranslationY(d(28));
         column.animate().alpha(1f).translationY(0).setDuration(700).setInterpolator(EASE_OUT).start();
@@ -272,6 +278,11 @@ public class LibraryActivity extends Activity {
         }
         if (!apps.isEmpty()) swapName(apps.get(focus).label, animate);
         int row = focus / COLUMNS;
+        int rows = (apps.size() + COLUMNS - 1) / COLUMNS;
+        if (scroll != null && !apps.isEmpty()) {
+            scroll.show(true, animate);
+            scroll.set(rows, 4, Math.max(0, row - 3), animate);
+        }
         grid.animate().translationY(-Math.max(0, row - 3) * d(170)).setDuration(animate ? 600 : 0).setInterpolator(EASE_OUT).start();
     }
 
@@ -296,7 +307,7 @@ public class LibraryActivity extends Activity {
         name.forceHasOverlappingRendering(false);   // no off-screen layer to cut a round first letter mid-fade
         name.setPadding(d(24) + d(12), d(10), d(24), d(10));   // room on every side: nothing is cut
         name.setTranslationX(-d(24) - d(12));
-        nameBox.addView(name, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM | Gravity.START));
+        nameBox.addView(name, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL | Gravity.START));
         if (animate) {
             name.setTranslationY(d(24));
             name.setAlpha(0f);

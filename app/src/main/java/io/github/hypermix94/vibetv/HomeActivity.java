@@ -59,7 +59,7 @@ public class HomeActivity extends Activity {
     private int litAction = -1;
 
     /** Where the remote is: the top right buttons, the dock, or the apps below. */
-    private enum Zone { TOP, DOCK, APPS }
+    private enum Zone { TOP, DOCK, SEARCH, APPS }
 
     private Zone zone = Zone.DOCK;
     private LinearLayout dockRow;
@@ -69,6 +69,16 @@ public class HomeActivity extends Activity {
     private boolean moving;
     private boolean longPressed;
     private WifiIcon wifiIcon;
+    private ScrollBar scroll;
+    /** The apps the grid shows now: every app on Home, or those matching the search. */
+    private final List<App> grid = new ArrayList<>();
+    private LinearLayout gridRows;
+    private LinearLayout searchPill;
+    private FrameLayout micButton;
+    private android.widget.EditText query;
+    private android.speech.SpeechRecognizer recognizer;
+    private int searchFocus;   // 0 the field, 1 the mic
+    private boolean typing, listening;
     private FrameLayout headingBox;
     private TextView heading;
     /** The dock and hidden apps as they were when this screen was built. */
@@ -120,12 +130,21 @@ public class HomeActivity extends Activity {
     @Override
     protected void onPause() {
         main.removeCallbacks(tick);
+        if (listening && recognizer != null) recognizer.cancel();
+        if (listening) doneListening();
         super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (recognizer != null) recognizer.destroy();
+        super.onDestroy();
     }
 
     @Override
     public void onBackPressed() {
         if (zone != Zone.DOCK) {   // Back from the buttons or the apps returns to the dock; on Home it goes nowhere
+            if (query != null && query.length() > 0) query.setText("");   // and clears a search
             zone = Zone.DOCK;
             paintFocus(true);
         }
@@ -296,21 +315,60 @@ public class HomeActivity extends Activity {
         apps.setOrientation(LinearLayout.VERTICAL);
         apps.setClipChildren(false);
         // "Apps", and once the remote is down here, the focused app's name in its place.
+        FrameLayout headRow = new FrameLayout(this);
+        headRow.setClipChildren(false);
         headingBox = new FrameLayout(this);
         headingBox.setClipChildren(false);
-        apps.addView(headingBox, new LinearLayout.LayoutParams(-1, d(60)));
+        headRow.addView(headingBox, new FrameLayout.LayoutParams(-1, -1));
+        headRow.addView(buildSearch(), new FrameLayout.LayoutParams(d(600), d(68), Gravity.END | Gravity.CENTER_VERTICAL));
+        apps.addView(headRow, new LinearLayout.LayoutParams(-1, d(72)));
         swapHeading("Apps", false);
+        gridRows = new LinearLayout(this);
+        gridRows.setOrientation(LinearLayout.VERTICAL);
+        gridRows.setClipChildren(false);
+        apps.addView(gridRows, new LinearLayout.LayoutParams(-1, -2));
+        buildGrid("");
+        // The "Apps" heading peeks above the bottom edge, so there is plainly more below the dock.
+        page.addView(apps, at(-1, -2, Gravity.TOP, 112, 1000, 112, 0));
+
+        // On the right: where in the apps the remote is. It shows while the remote is down in the apps.
+        scroll = new ScrollBar(this, s);
+        root.addView(scroll, at(d(20), -1, Gravity.END, 0, 330, 48, 110));
+
+        credit = text(18, R.font.outfit_regular, 0xB3FFFFFF);
+        root.addView(credit, at(-2, -2, Gravity.BOTTOM | Gravity.END, 0, 0, 112, 40));
+
+        greetingLine();
+        return root;
+    }
+
+    /** Fills the grid with the apps matching {@code q} (all of them when empty), then "All apps" when not searching. */
+    private void buildGrid(String q) {
+        gridRows.removeAllViews();
+        appTiles.clear();
+        grid.clear();
+        String needle = q.trim().toLowerCase(java.util.Locale.ROOT);
+        for (App a : others) {
+            if (needle.isEmpty() || a.label.toLowerCase(java.util.Locale.ROOT).contains(needle)) grid.add(a);
+        }
+        if (!needle.isEmpty()) {   // a search also finds apps in the dock and off Home
+            for (App a : Apps.all(this).values()) {
+                boolean listed = false;
+                for (App g : grid) listed |= g.pkg.equals(a.pkg);
+                if (!listed && a.label.toLowerCase(java.util.Locale.ROOT).contains(needle)) grid.add(a);
+            }
+        }
+        int cards = grid.size() + (needle.isEmpty() ? 1 : 0);   // "All apps" closes the grid when not searching
         LinearLayout row = null;
-        int cards = others.size() + 1;   // every app, then "Not on Home"
         for (int i = 0; i < cards; i++) {
             if (i % COLUMNS == 0) {
                 row = new LinearLayout(this);
                 row.setClipChildren(false);
                 LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, d(156));   // phone-tight rows
                 rowLp.topMargin = d(14);
-                apps.addView(row, rowLp);
+                gridRows.addView(row, rowLp);
             }
-            FrameLayout t = i < others.size() ? Cards.app(this, s, others.get(i))
+            FrameLayout t = i < grid.size() ? Cards.app(this, s, grid.get(i))
                     : Cards.action(this, s, R.drawable.ic_apps_more, "All apps");
             t.setAlpha(0.9f);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1f);
@@ -325,14 +383,177 @@ public class HomeActivity extends Activity {
                 row.addView(new View(this), lp);
             }
         }
-        // The "Apps" heading peeks above the bottom edge, so there is plainly more below the dock.
-        page.addView(apps, at(-1, -2, Gravity.TOP, 112, 1000, 112, 0));
+        appFocus = Math.min(appFocus, Math.max(0, appTiles.size() - 1));
+    }
 
-        credit = text(18, R.font.outfit_regular, 0xB3FFFFFF);
-        root.addView(credit, at(-2, -2, Gravity.BOTTOM | Gravity.END, 0, 0, 112, 40));
+    /** The search pill: a magnifier, the words, and a mic button to say an app's name. */
+    private View buildSearch() {
+        searchPill = new LinearLayout(this);
+        searchPill.setGravity(Gravity.CENTER_VERTICAL);
+        searchPill.setPadding(d(24), 0, d(8), 0);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0x26FFFFFF);
+        bg.setCornerRadius(d(34));
+        searchPill.setBackground(bg);
+        ImageView glass = new ImageView(this);
+        glass.setImageResource(R.drawable.ic_search);
+        glass.setAlpha(0.8f);
+        searchPill.addView(glass, new LinearLayout.LayoutParams(d(30), d(30)));
+        query = new android.widget.EditText(this);
+        query.setBackground(null);
+        query.setSingleLine(true);
+        query.setTextColor(Color.WHITE);
+        query.setHintTextColor(0x99FFFFFF);
+        query.setHint("Search apps");
+        query.setTextSize(TypedValue.COMPLEX_UNIT_PX, d(28));
+        query.setTypeface(getResources().getFont(R.font.outfit_regular));
+        query.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        query.setFocusable(false);   // the remote drives the screen until OK is pressed on the field
+        query.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence t, int a, int b, int c) {
+            }
 
-        greetingLine();
-        return root;
+            @Override
+            public void onTextChanged(CharSequence t, int a, int b, int c) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+                buildGrid(e.toString());
+                Cards.ripple(appTiles, 0.9f);
+                paintFocus(true);
+            }
+        });
+        query.setOnEditorActionListener((v, action, ev) -> {
+            stopTyping();
+            return true;
+        });
+        LinearLayout.LayoutParams qLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        qLp.leftMargin = d(14);
+        searchPill.addView(query, qLp);
+        micButton = new FrameLayout(this);
+        View disc = new View(this);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(Color.WHITE);
+        disc.setBackground(circle);
+        disc.setAlpha(0f);
+        micButton.addView(disc, match());
+        ImageView mic = new ImageView(this);
+        mic.setImageResource(R.drawable.ic_mic);
+        micButton.addView(mic, new FrameLayout.LayoutParams(d(30), d(30), Gravity.CENTER));
+        micButton.setContentDescription("Search by voice");
+        searchPill.addView(micButton, new LinearLayout.LayoutParams(d(54), d(54)));
+        return searchPill;
+    }
+
+    /** OK on the field: the on-screen keyboard comes up and the grid filters as you type. */
+    private void startTyping() {
+        typing = true;
+        query.setFocusable(true);
+        query.setFocusableInTouchMode(true);
+        query.requestFocus();
+        android.view.inputmethod.InputMethodManager imm = getSystemService(android.view.inputmethod.InputMethodManager.class);
+        imm.showSoftInput(query, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+    }
+
+    private void stopTyping() {
+        typing = false;
+        android.view.inputmethod.InputMethodManager imm = getSystemService(android.view.inputmethod.InputMethodManager.class);
+        imm.hideSoftInputFromWindow(query.getWindowToken(), 0);
+        query.clearFocus();
+        query.setFocusable(false);
+        if (!grid.isEmpty()) {   // go straight to the results
+            zone = Zone.APPS;
+            appFocus = 0;
+        }
+        paintFocus(true);
+    }
+
+    /** The mic: listen for an app's name and search for it. */
+    private void listen() {
+        if (listening) {
+            if (recognizer != null) recognizer.stopListening();
+            return;
+        }
+        if (!android.speech.SpeechRecognizer.isRecognitionAvailable(this)) {
+            query.setHint("Voice search is not available on this TV");
+            return;
+        }
+        if (recognizer == null) {
+            recognizer = android.speech.SpeechRecognizer.createSpeechRecognizer(this);
+            recognizer.setRecognitionListener(new android.speech.RecognitionListener() {
+                @Override
+                public void onReadyForSpeech(Bundle b) {
+                    query.setHint("Listening\u2026");
+                }
+
+                @Override
+                public void onBeginningOfSpeech() {
+                }
+
+                @Override
+                public void onRmsChanged(float db) {
+                    float k = 1f + Math.max(0f, Math.min(1f, (db + 2f) / 12f)) * 0.18f;   // the mic grows with the voice
+                    micButton.setScaleX(k);
+                    micButton.setScaleY(k);
+                }
+
+                @Override
+                public void onBufferReceived(byte[] b) {
+                }
+
+                @Override
+                public void onEndOfSpeech() {
+                }
+
+                @Override
+                public void onError(int error) {
+                    doneListening();
+                    query.setHint(error == android.speech.SpeechRecognizer.ERROR_NO_MATCH
+                            || error == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                            ? "Didn't catch that. Try again" : "Voice search is not working right now");
+                }
+
+                @Override
+                public void onResults(Bundle b) {
+                    doneListening();
+                    java.util.ArrayList<String> said = b.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (said != null && !said.isEmpty()) {
+                        query.setText(said.get(0));
+                        if (!grid.isEmpty()) {
+                            zone = Zone.APPS;
+                            appFocus = 0;
+                            paintFocus(true);
+                        }
+                    }
+                }
+
+                @Override
+                public void onPartialResults(Bundle b) {
+                    java.util.ArrayList<String> said = b.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (said != null && !said.isEmpty() && !said.get(0).isEmpty()) query.setText(said.get(0));
+                }
+
+                @Override
+                public void onEvent(int type, Bundle b) {
+                }
+            });
+        }
+        Intent i = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+        listening = true;
+        query.setText("");
+        recognizer.startListening(i);
+    }
+
+    private void doneListening() {
+        listening = false;
+        query.setHint("Search apps");
+        micButton.animate().scaleX(1f).scaleY(1f).setDuration(250).start();
     }
 
     /** A dock tile: the app's banner, or a Material card when it has none. */
@@ -364,6 +585,22 @@ public class HomeActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int k = e.getKeyCode();
+        if (typing) {   // the on-screen keyboard and the field have the keys; Back finishes typing
+            if (k == KeyEvent.KEYCODE_BACK && e.getAction() == KeyEvent.ACTION_UP) {
+                stopTyping();
+                return true;
+            }
+            return super.dispatchKeyEvent(e);
+        }
+        if (k == KeyEvent.KEYCODE_SEARCH || k == KeyEvent.KEYCODE_VOICE_ASSIST || k == KeyEvent.KEYCODE_ASSIST) {
+            if (e.getAction() == KeyEvent.ACTION_UP) {   // the remote's voice button: straight to listening
+                zone = Zone.SEARCH;
+                searchFocus = 1;
+                paintFocus(true);
+                listen();
+            }
+            return true;
+        }
         boolean ok = k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER || k == KeyEvent.KEYCODE_NUMPAD_ENTER;
         if (ok) {
             // OK acts when it comes up; held for half a second it opens the menu instead.
@@ -372,7 +609,7 @@ public class HomeActivity extends Activity {
                     longPressed = false;
                     e.startTracking();   // lets Android flag the hold as a long press
                 }
-                else if (!longPressed && menu == null && !moving && zone != Zone.TOP
+                else if (!longPressed && menu == null && !moving && (zone == Zone.DOCK || zone == Zone.APPS)
                         && (e.isLongPress() || e.getEventTime() - e.getDownTime() > 500)) {
                     longPressed = true;
                     openMenu();
@@ -430,6 +667,10 @@ public class HomeActivity extends Activity {
                 zone = Zone.APPS;
                 Cards.ripple(appTiles, 0.9f);   // the icons arrive one after another
             }
+        } else if (zone == Zone.SEARCH) {
+            if (dx != 0) searchFocus = dx > 0 ? 1 : 0;
+            else if (dy < 0) zone = Zone.DOCK;
+            else if (!appTiles.isEmpty()) zone = Zone.APPS;
         } else if (zone == Zone.TOP) {
             if (dx != 0) actionFocus = Math.max(0, Math.min(actions.size() - 1, actionFocus + dx));
             else if (dy > 0) zone = Zone.DOCK;
@@ -439,7 +680,7 @@ public class HomeActivity extends Activity {
                 int nextCol = col + dx;
                 if (nextCol >= 0 && nextCol < COLUMNS && appFocus + dx < cards) appFocus += dx;
             } else if (dy < 0) {
-                if (rowIndex == 0) zone = Zone.DOCK;
+                if (rowIndex == 0) zone = Zone.SEARCH;
                 else appFocus -= COLUMNS;
             } else if (appFocus + COLUMNS < cards) {
                 appFocus += COLUMNS;
@@ -451,12 +692,17 @@ public class HomeActivity extends Activity {
     }
 
     private void press() {
+        if (zone == Zone.SEARCH) {
+            if (searchFocus == 0) startTyping();
+            else listen();
+            return;
+        }
         if (zone == Zone.DOCK) {
             bounce(dockTiles.get(dockFocus));
             open(dock.get(dockFocus));
         } else if (zone == Zone.APPS) {
             bounce(appTiles.get(appFocus));
-            if (appFocus < others.size()) open(others.get(appFocus));
+            if (appFocus < grid.size()) open(grid.get(appFocus));
             else startActivity(new Intent(this, LibraryActivity.class));   // the "All apps" page
         } else {
             openSetting(actionFocus);
@@ -467,7 +713,7 @@ public class HomeActivity extends Activity {
 
     private App focusedApp() {
         if (zone == Zone.DOCK) return dock.isEmpty() ? null : dock.get(dockFocus);
-        return zone == Zone.APPS && appFocus < others.size() ? others.get(appFocus) : null;
+        return zone == Zone.APPS && appFocus < grid.size() ? grid.get(appFocus) : null;
     }
 
     private View focusedTile() {
@@ -582,10 +828,15 @@ public class HomeActivity extends Activity {
         if (lit != litAction) paintActions(lit, slow);
         litAction = lit;
         // Down to the apps: the page slides up, the words above fade, and the picture dims.
-        boolean inApps = zone == Zone.APPS;
-        swapHeading(!inApps ? "Apps" : appFocus < others.size() ? others.get(appFocus).label : "All apps", animate);
-        int row = inApps ? appFocus / COLUMNS : 0;
+        boolean inApps = zone == Zone.APPS || zone == Zone.SEARCH;
+        swapHeading(zone == Zone.SEARCH ? (grid.isEmpty() ? "No apps match" : "Search")
+                : !inApps ? "Apps" : appFocus < grid.size() ? grid.get(appFocus).label : "All apps", animate);
+        paintSearch(animate);
+        int row = zone == Zone.APPS ? appFocus / COLUMNS : 0;
         float pageY = inApps ? -d(700) - Math.max(0, row - 1) * d(170) : 0;
+        int rows = (appTiles.size() + COLUMNS - 1) / COLUMNS;
+        scroll.show(inApps, animate);
+        if (inApps) scroll.set(rows, 4, Math.max(0, row - 1), animate);   // about four rows fit on screen
         page.animate().translationY(pageY).setDuration(animate ? 700 : 0).setInterpolator(EASE_OUT).start();
         for (View v : new View[]{heroBox, (View) hm.getParent().getParent(), (View) actions.get(0).getParent()}) {
             v.animate().alpha(inApps ? 0f : 1f).setDuration(animate ? 500 : 0).start();
@@ -625,6 +876,19 @@ public class HomeActivity extends Activity {
                 }
             }
         }
+    }
+
+    /** The search pill's focus: a white edge on the field, a white disc on the mic. */
+    private void paintSearch(boolean animate) {
+        if (searchPill == null) return;
+        boolean onField = zone == Zone.SEARCH && searchFocus == 0, onMic = zone == Zone.SEARCH && searchFocus == 1;
+        GradientDrawable bg = (GradientDrawable) searchPill.getBackground();
+        bg.setStroke(d(3), onField || typing ? Color.WHITE : 0x00FFFFFF);
+        bg.setColor(onField || typing ? 0x40FFFFFF : 0x26FFFFFF);
+        micButton.getChildAt(0).animate().alpha(onMic || listening ? 1f : 0f).setDuration(animate ? 400 : 0).start();
+        ((ImageView) micButton.getChildAt(1)).setColorFilter(onMic || listening ? Color.BLACK : Color.WHITE);
+        searchPill.animate().scaleX(zone == Zone.SEARCH ? 1.03f : 1f).scaleY(zone == Zone.SEARCH ? 1.03f : 1f)
+                .setDuration(animate ? 400 : 0).setInterpolator(EASE_OUT).start();
     }
 
     /** The heading over the apps: the old words lift away as the new ones rise into place. */
