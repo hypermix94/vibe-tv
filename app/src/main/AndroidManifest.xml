@@ -64,7 +64,7 @@
         <activity
             android:name=".SettingsActivity"
             android:exported="true"
-            android:label="Settings"
+            android:label="Home settings"
             android:icon="@drawable/ic_settings_app"
             android:excludeFromRecents="true"
             android:screenOrientation="landscape"

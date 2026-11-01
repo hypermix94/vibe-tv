@@ -108,7 +108,7 @@ public class SettingsActivity extends Activity {
         column.setOrientation(LinearLayout.VERTICAL);
         column.setClipChildren(false);
         TextView title = Cards.text(this, s, 64, R.font.outfit_medium, Color.WHITE);
-        title.setText("Settings");
+        title.setText("Home settings");
         title.setLetterSpacing(-0.03f);
         column.addView(title);
         TextView sub = Cards.text(this, s, 26, R.font.outfit_regular, 0x99FFFFFF);
