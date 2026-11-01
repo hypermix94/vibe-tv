@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Remove from Home: an eye struck through. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M2.5,12C4.5,8 8,5.5 12,5.5S19.5,8 21.5,12C19.5,16 16,18.5 12,18.5S4.5,16 2.5,12ZM9.5,12A2.5,2.5 0 1 0 14.5,12A2.5,2.5 0 1 0 9.5,12M4,20L20,4" android:strokeColor="#FFFFFFFF" android:strokeWidth="2"
+        android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
+
+</vector>

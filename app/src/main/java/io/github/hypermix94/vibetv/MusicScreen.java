@@ -253,6 +253,13 @@ final class MusicScreen extends android.content.ContextWrapper {
         backdrop = new ImageView(this);
         root.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
         party = new PartyView(this);
+        // The cover pumps with the bass, eased every frame by the party view so it swells rather than jumps.
+        party.setOnFrame(() -> {
+            if (!partyOn) return;
+            float pump = party.pump();
+            cover.setScaleX(pump);
+            cover.setScaleY(pump);
+        });
         party.setAlpha(0f);
         party.setVisibility(View.INVISIBLE);
         root.addView(party, new FrameLayout.LayoutParams(-1, -1));
@@ -620,11 +627,12 @@ final class MusicScreen extends android.content.ContextWrapper {
         breathe(level[0]);
     }
 
-    /** The normal screen stays still; in party mode the cover pumps with the bass. */
+    /** The normal screen stays still (party mode pumps the cover itself, every frame). */
     private void breathe(float bass) {
-        float pump = partyOn ? 1f + 0.05f * party.bass() : 1f;
-        cover.setScaleX(pump);
-        cover.setScaleY(pump);
+        if (!partyOn && cover.getScaleX() != 1f) {   // party mode off: the cover settles back
+            cover.setScaleX(1f);
+            cover.setScaleY(1f);
+        }
     }
 
     /** A cover colour made bright enough to read on the dark background. */

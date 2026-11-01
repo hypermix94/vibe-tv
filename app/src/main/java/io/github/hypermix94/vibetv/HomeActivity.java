@@ -5,13 +5,8 @@ import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.graphics.Color;
-import android.graphics.Outline;
 import android.graphics.Typeface;
-import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
@@ -22,7 +17,6 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewOutlineProvider;
 import android.view.animation.Interpolator;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.OvershootInterpolator;
@@ -32,10 +26,11 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import io.github.hypermix94.vibetv.Apps.App;
+
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,22 +44,6 @@ public class HomeActivity extends Activity {
     private static final int DOCK = 6, COLUMNS = 6;
     private static final Interpolator EASE_OUT = new PathInterpolator(0.22f, 1f, 0.36f, 1f);
     private static final Interpolator SPRING = new OvershootInterpolator(1.4f);
-    private static final String PREFS = "home";
-
-    /** One app the home screen can open. */
-    private static final class App {
-        final String pkg, label;
-        final Intent launch;
-        final Drawable banner, icon;
-
-        App(String pkg, String label, Intent launch, Drawable banner, Drawable icon) {
-            this.pkg = pkg;
-            this.label = label;
-            this.launch = launch;
-            this.banner = banner;
-            this.icon = icon;
-        }
-    }
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private float s;   // screen pixels per design pixel
@@ -85,18 +64,21 @@ public class HomeActivity extends Activity {
     private Zone zone = Zone.DOCK;
     private LinearLayout dockRow;
     /** The hold-OK menu, while it is open, and the item picked in it. */
-    private LinearLayout menu;
-    private final List<TextView> menuItems = new ArrayList<>();
-    private int menuFocus;
+    private Menu menu;
     /** Moving a dock app: Left and Right shift it along the dock, OK or Back sets it down. */
     private boolean moving;
     private boolean longPressed;
+    private FrameLayout headingBox;
+    private TextView heading;
+    /** The dock and hidden apps as they were when this screen was built. */
+    private long builtRevision;
     private int dockFocus, actionFocus, appFocus;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         s = getResources().getDisplayMetrics().widthPixels / 1920f;
+        builtRevision = Apps.revision(this);
         loadApps();
         setContentView(build());
         paintFocus(false);
@@ -117,6 +99,10 @@ public class HomeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (Apps.revision(this) != builtRevision) {   // apps were added or put back on another page
+            recreate();
+            return;
+        }
         List<App> shown = new ArrayList<>(dock);
         shown.addAll(others);
         for (App a : shown) {   // an app was uninstalled while we were away: rebuild with the apps there are now
@@ -147,34 +133,20 @@ public class HomeActivity extends Activity {
     // ---- the apps ---------------------------------------------------------------------------------
 
     private void loadApps() {
-        PackageManager pm = getPackageManager();
-        Map<String, App> all = new LinkedHashMap<>();
-        for (String category : new String[]{Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER}) {
-            Intent q = new Intent(Intent.ACTION_MAIN).addCategory(category);
-            for (ResolveInfo r : pm.queryIntentActivities(q, 0)) {
-                ActivityInfo a = r.activityInfo;
-                if (a.packageName.equals(getPackageName()) || all.containsKey(a.packageName)) continue;
-                Intent launch = new Intent(Intent.ACTION_MAIN).addCategory(category)
-                        .setClassName(a.packageName, a.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                Drawable banner = a.loadBanner(pm);
-                if (banner == null) banner = a.applicationInfo.loadBanner(pm);
-                all.put(a.packageName, new App(a.packageName, r.loadLabel(pm).toString(), launch, banner, a.loadIcon(pm)));
-            }
+        Map<String, App> all = Apps.all(this);
+        java.util.Set<String> hidden = Apps.hidden(this);
+        boolean unset = Apps.dockOrder(this).isEmpty();
+        for (String pkg : Apps.dockOrder(this)) {
+            App a = all.remove(pkg);
+            if (a != null && dock.size() < Apps.MAX_DOCK) dock.add(a);
         }
-        String saved = prefs().getString("dock", "");
-        for (String pkg : (saved.isEmpty() ? getString(R.string.dock_apps) : saved).split(",")) {
-            App a = all.remove(pkg.trim());
-            if (a != null && dock.size() < DOCK) dock.add(a);
-        }
-        List<App> rest = new ArrayList<>(all.values());
-        rest.sort((a, b) -> a.label.compareToIgnoreCase(b.label));
-        while (dock.size() < DOCK && !rest.isEmpty()) dock.add(rest.remove(0));   // fill an unset dock
-        others.addAll(rest);
+        for (App a : all.values()) if (!hidden.contains(a.pkg)) others.add(a);
+        while (unset && dock.size() < DOCK && !others.isEmpty()) dock.add(others.remove(0));   // a first-run dock
     }
 
     private void open(App a) {
         if (a == null) return;
-        prefs().edit().putLong("opened_" + a.pkg, System.currentTimeMillis()).apply();
+        Apps.markOpened(this, a.pkg);
         try {
             startActivity(a.launch);
         } catch (RuntimeException e) {
@@ -192,7 +164,7 @@ public class HomeActivity extends Activity {
     }
 
     private SharedPreferences prefs() {
-        return getSharedPreferences(PREFS, MODE_PRIVATE);
+        return Apps.prefs(this);
     }
 
     // ---- building the screen ---------------------------------------------------------------------
@@ -218,6 +190,7 @@ public class HomeActivity extends Activity {
         // Top left: greeting, clock, date.
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.VERTICAL);
+        top.setClipChildren(false);
         LinearLayout greetRow = new LinearLayout(this);
         greetRow.setGravity(Gravity.CENTER_VERTICAL);
         greeting = text(30, R.font.outfit_regular, 0xB8FFFFFF);
@@ -229,6 +202,7 @@ public class HomeActivity extends Activity {
         greetRow.addView(character, charLp);
         top.addView(greetRow);
         LinearLayout clock = new LinearLayout(this);
+        clock.setClipChildren(false);
         hm = text(96, R.font.outfit_extralight, Color.WHITE);
         hm.setLetterSpacing(-0.04f);
         hm.setTranslationX(-0.055f * d(96));   // light digits sit a little in from their box
@@ -295,15 +269,20 @@ public class HomeActivity extends Activity {
 
         // The focused app's name, large, and when it was last opened.
         heroBox = new FrameLayout(this);
+        heroBox.setClipChildren(false);
         page.addView(heroBox, at(d(1400), d(300), Gravity.BOTTOM | Gravity.START, 112, 0, 0, 390));
 
         // The dock.
         dockRow = new LinearLayout(this);
         dockRow.setClipChildren(false);
         dockRow.setClipToPadding(false);
+        // However many apps it holds, the dock fills the same width: the tiles shrink to fit, keeping 16:9.
+        int n = Math.max(1, dock.size());
+        float tileW = (1920f - 2 * 112 - (n - 1) * 32f) / n;
+        int tileH = d(Math.min(144f, tileW * 9f / 16f));
         for (int i = 0; i < dock.size(); i++) {
             FrameLayout t = tile(dock.get(i), true);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, d(144), 1f);   // 16:9, like TV banners
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, tileH, 1f);
             if (i > 0) lp.leftMargin = d(32);
             dockRow.addView(t, lp);
             t.setTag("rise:" + (420 + 70 * i));
@@ -315,12 +294,14 @@ public class HomeActivity extends Activity {
         LinearLayout apps = new LinearLayout(this);
         apps.setOrientation(LinearLayout.VERTICAL);
         apps.setClipChildren(false);
-        TextView heading = text(48, R.font.outfit_medium, Color.WHITE);
-        heading.setText("Apps");
-        heading.setLetterSpacing(-0.02f);
-        apps.addView(heading);
+        // "Apps", and once the remote is down here, the focused app's name in its place.
+        headingBox = new FrameLayout(this);
+        headingBox.setClipChildren(false);
+        apps.addView(headingBox, new LinearLayout.LayoutParams(-1, d(60)));
+        swapHeading("Apps", false);
         LinearLayout row = null;
-        for (int i = 0; i < others.size(); i++) {
+        int cards = others.size() + 1;   // every app, then "Not on Home"
+        for (int i = 0; i < cards; i++) {
             if (i % COLUMNS == 0) {
                 row = new LinearLayout(this);
                 row.setClipChildren(false);
@@ -328,14 +309,16 @@ public class HomeActivity extends Activity {
                 rowLp.topMargin = d(30);
                 apps.addView(row, rowLp);
             }
-            FrameLayout t = tile(others.get(i), false);
+            FrameLayout t = i < others.size() ? Cards.app(this, s, others.get(i))
+                    : Cards.action(this, s, R.drawable.ic_apps_more, "All apps");
+            t.setAlpha(0.9f);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1f);
             if (i % COLUMNS > 0) lp.leftMargin = d(32);
             row.addView(t, lp);
             appTiles.add(t);
         }
         if (row != null) {
-            for (int i = others.size() % COLUMNS; i > 0 && i < COLUMNS; i++) {   // keep the last row's tiles the same width
+            for (int i = cards % COLUMNS; i > 0 && i < COLUMNS; i++) {   // keep the last row's tiles the same width
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1f);
                 lp.leftMargin = d(32);
                 row.addView(new View(this), lp);
@@ -351,38 +334,26 @@ public class HomeActivity extends Activity {
         return root;
     }
 
-    /** An app tile: its banner, or its icon and name on a dark tile when it has no banner. */
+    /** A dock tile: the app's banner, or a Material card when it has none. */
     private FrameLayout tile(App a, boolean inDock) {
-        FrameLayout t = new FrameLayout(this);
-        t.setOutlineProvider(new ViewOutlineProvider() {
-            @Override
-            public void getOutline(View v, Outline o) {
-                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), d(8));
-            }
-        });
-        t.setClipToOutline(true);
-        if (a.banner != null) {
-            ImageView b = new ImageView(this);
-            b.setImageDrawable(a.banner);
-            b.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            t.addView(b, match());
-        } else {
-            t.setBackgroundColor(0xFF2A2D35);
-            ImageView icon = new ImageView(this);
-            icon.setImageDrawable(a.icon);
-            t.addView(icon, at(d(52), d(52), Gravity.TOP | Gravity.START, 20, 18, 0, 0));
-            TextView name = text(24, R.font.outfit_medium, Color.WHITE);
-            name.setText(a.label);
-            name.setSingleLine(true);
-            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            t.addView(name, at(-1, -2, Gravity.BOTTOM | Gravity.START, 20, 0, 16, 16));
+        if (a.banner == null) {
+            FrameLayout c = Cards.app(this, s, a);
+            c.setAlpha(0.78f);
+            return c;
         }
+        FrameLayout t = new FrameLayout(this);
+        t.setOutlineProvider(Cards.rounded(s, 8));
+        t.setClipToOutline(true);
+        ImageView b = new ImageView(this);
+        b.setImageDrawable(a.banner);
+        b.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        t.addView(b, match());
         GradientDrawable ring = new GradientDrawable();
         ring.setCornerRadius(d(8));
         ring.setStroke(d(5), Color.WHITE);
         t.setForeground(ring);
         t.getForeground().setAlpha(0);
-        t.setAlpha(inDock ? 0.78f : 0.9f);
+        t.setAlpha(0.78f);
         t.setContentDescription(a.label);
         return t;
     }
@@ -415,8 +386,7 @@ public class HomeActivity extends Activity {
         if (e.getAction() != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(e);
         if (menu != null) {
             if (k == KeyEvent.KEYCODE_DPAD_UP || k == KeyEvent.KEYCODE_DPAD_DOWN) {
-                menuFocus = Math.max(0, Math.min(menuItems.size() - 1, menuFocus + (k == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1)));
-                paintMenu();
+                menu.move(k == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1);
             } else if (k == KeyEvent.KEYCODE_BACK) {
                 closeMenu();
             }
@@ -455,24 +425,24 @@ public class HomeActivity extends Activity {
                 showHero(false);
             } else if (dy < 0) {
                 zone = Zone.TOP;
-            } else if (!others.isEmpty()) {
+            } else {
                 zone = Zone.APPS;
             }
         } else if (zone == Zone.TOP) {
             if (dx != 0) actionFocus = Math.max(0, Math.min(actions.size() - 1, actionFocus + dx));
             else if (dy > 0) zone = Zone.DOCK;
         } else {
-            int col = appFocus % COLUMNS, rowIndex = appFocus / COLUMNS;
+            int cards = appTiles.size(), col = appFocus % COLUMNS, rowIndex = appFocus / COLUMNS;
             if (dx != 0) {
                 int nextCol = col + dx;
-                if (nextCol >= 0 && nextCol < COLUMNS && appFocus + dx < others.size()) appFocus += dx;
+                if (nextCol >= 0 && nextCol < COLUMNS && appFocus + dx < cards) appFocus += dx;
             } else if (dy < 0) {
                 if (rowIndex == 0) zone = Zone.DOCK;
                 else appFocus -= COLUMNS;
-            } else if (appFocus + COLUMNS < others.size()) {
+            } else if (appFocus + COLUMNS < cards) {
                 appFocus += COLUMNS;
-            } else if (rowIndex < (others.size() - 1) / COLUMNS) {
-                appFocus = others.size() - 1;
+            } else if (rowIndex < (cards - 1) / COLUMNS) {
+                appFocus = cards - 1;
             }
         }
         paintFocus(true);
@@ -484,7 +454,8 @@ public class HomeActivity extends Activity {
             open(dock.get(dockFocus));
         } else if (zone == Zone.APPS) {
             bounce(appTiles.get(appFocus));
-            open(others.get(appFocus));
+            if (appFocus < others.size()) open(others.get(appFocus));
+            else startActivity(new Intent(this, LibraryActivity.class));   // the "All apps" page
         } else {
             openSetting(actionFocus);
         }
@@ -493,7 +464,8 @@ public class HomeActivity extends Activity {
     // ---- the hold-OK menu ----------------------------------------------------------------------------
 
     private App focusedApp() {
-        return zone == Zone.DOCK ? dock.get(dockFocus) : zone == Zone.APPS ? others.get(appFocus) : null;
+        if (zone == Zone.DOCK) return dock.isEmpty() ? null : dock.get(dockFocus);
+        return zone == Zone.APPS && appFocus < others.size() ? others.get(appFocus) : null;
     }
 
     private View focusedTile() {
@@ -503,63 +475,28 @@ public class HomeActivity extends Activity {
     private void openMenu() {
         App a = focusedApp();
         if (a == null) return;
-        menu = new LinearLayout(this);
-        menu.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable card = new GradientDrawable();
-        card.setColor(0xF21C1E24);
-        card.setCornerRadius(d(16));
-        menu.setBackground(card);
-        menu.setPadding(d(10), d(10), d(10), d(10));
-        menu.setElevation(d(30));
-        menuItems.clear();
-        String[] items = zone == Zone.DOCK ? new String[]{"Move", "App info", "Uninstall"}
-                : new String[]{"Add to dock", "App info", "Uninstall"};
-        for (String label : items) {
-            TextView t = text(28, R.font.outfit_medium, Color.WHITE);
-            t.setText(label);
-            t.setPadding(d(24), d(16), d(48), d(16));
-            menu.addView(t, new LinearLayout.LayoutParams(-1, -2));
-            menuItems.add(t);
-        }
-        menuFocus = 0;
-        paintMenu();
-        // Above the tile, lined up with its left edge.
-        View tile = focusedTile();
-        int[] at = new int[2], rootAt = new int[2];
-        tile.getLocationOnScreen(at);
-        root.getLocationOnScreen(rootAt);
-        menu.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Math.max(d(300), menu.getMeasuredWidth()), -2);
-        lp.leftMargin = Math.min(at[0] - rootAt[0], root.getWidth() - d(112) - lp.width);
-        lp.topMargin = Math.max(d(40), at[1] - rootAt[1] - menu.getMeasuredHeight() - d(28));
-        root.addView(menu, lp);
-        menu.setAlpha(0f);
-        menu.setTranslationY(d(16));
-        menu.animate().alpha(1f).translationY(0).setDuration(320).setInterpolator(EASE_OUT).start();
-    }
-
-    private void paintMenu() {
-        for (int i = 0; i < menuItems.size(); i++) {
-            TextView t = menuItems.get(i);
-            boolean on = i == menuFocus;
-            GradientDrawable bg = new GradientDrawable();
-            bg.setCornerRadius(d(10));
-            bg.setColor(on ? Color.WHITE : 0x00000000);
-            t.setBackground(bg);
-            t.setTextColor(on ? Color.BLACK : Color.WHITE);
-        }
+        boolean inDock = zone == Zone.DOCK;
+        String[] items = inDock
+                ? new String[]{"Move", "Remove from dock", "Remove from Home", "App info", "Uninstall"}
+                : new String[]{"Add to dock", "Remove from Home", "App info", "Uninstall"};
+        int[] icons = inDock
+                ? new int[]{R.drawable.ic_menu_move, R.drawable.ic_menu_dock_remove, R.drawable.ic_menu_hide,
+                        R.drawable.ic_menu_info, R.drawable.ic_menu_delete}
+                : new int[]{R.drawable.ic_menu_dock_add, R.drawable.ic_menu_hide, R.drawable.ic_menu_info,
+                        R.drawable.ic_menu_delete};
+        menu = new Menu(this, s, items, icons);
+        menu.show(root, focusedTile());
     }
 
     private void closeMenu() {
         if (menu == null) return;
-        View m = menu;
+        menu.close();
         menu = null;
-        m.animate().alpha(0f).setDuration(200).withEndAction(() -> root.removeView(m)).start();
     }
 
     private void pickMenu() {
         App a = focusedApp();
-        String label = menuItems.get(menuFocus).getText().toString();
+        String label = menu.picked();
         closeMenu();
         if (a == null) return;
         switch (label) {
@@ -568,11 +505,18 @@ public class HomeActivity extends Activity {
                 dockTiles.get(dockFocus).animate().translationY(-d(30)).setDuration(300).setInterpolator(EASE_OUT).start();
                 break;
             case "Add to dock":
-                List<String> order = new ArrayList<>();
-                order.add(a.pkg);
-                for (App x : dock) order.add(x.pkg);
-                if (order.size() > DOCK) order = order.subList(0, DOCK);   // the last dock app goes back to Apps
-                prefs().edit().putString("dock", String.join(",", order)).apply();
+                if (!Apps.addToDock(this, a.pkg)) {
+                    android.widget.Toast.makeText(this, "The dock is full: remove an app from it first", android.widget.Toast.LENGTH_LONG).show();
+                    return;
+                }
+                recreate();
+                break;
+            case "Remove from dock":
+                Apps.removeFromDock(this, a.pkg);
+                recreate();
+                break;
+            case "Remove from Home":
+                Apps.setHidden(this, a.pkg, true);
                 recreate();
                 break;
             case "App info":
@@ -611,7 +555,7 @@ public class HomeActivity extends Activity {
         moving = false;
         List<String> order = new ArrayList<>();
         for (App x : dock) order.add(x.pkg);
-        prefs().edit().putString("dock", String.join(",", order)).apply();
+        Apps.saveDock(this, order);
         paintFocus(true);
         showHero(false);
     }
@@ -637,6 +581,7 @@ public class HomeActivity extends Activity {
         litAction = lit;
         // Down to the apps: the page slides up, the words above fade, and the picture dims.
         boolean inApps = zone == Zone.APPS;
+        swapHeading(!inApps ? "Apps" : appFocus < others.size() ? others.get(appFocus).label : "All apps", animate);
         int row = inApps ? appFocus / COLUMNS : 0;
         float pageY = inApps ? -d(700) - Math.max(0, row - 1) * d(174) : 0;
         page.animate().translationY(pageY).setDuration(animate ? 700 : 0).setInterpolator(EASE_OUT).start();
@@ -674,6 +619,30 @@ public class HomeActivity extends Activity {
         }
     }
 
+    /** The heading over the apps: the old words lift away as the new ones rise into place. */
+    private void swapHeading(String words, boolean animate) {
+        if (heading != null && words.contentEquals(heading.getText())) return;
+        if (heading != null) {
+            TextView old = heading;
+            if (animate) {
+                old.animate().translationY(-d(20)).alpha(0f).setDuration(380).setInterpolator(EASE_OUT)
+                        .withEndAction(() -> headingBox.removeView(old)).start();
+            } else {
+                headingBox.removeView(old);
+            }
+        }
+        heading = text(48, R.font.outfit_medium, Color.WHITE);
+        heading.setLetterSpacing(-0.02f);
+        heading.setSingleLine(true);
+        heading.setText(words);
+        headingBox.addView(heading, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM | Gravity.START));
+        if (animate) {
+            heading.setTranslationY(d(20));
+            heading.setAlpha(0f);
+            heading.animate().translationY(0).alpha(1f).setDuration(480).setInterpolator(EASE_OUT).start();
+        }
+    }
+
     private void lift(View t, boolean on, float restAlpha, long ms) {
         if (on && ms > 0) t.announceForAccessibility(t.getContentDescription());   // TalkBack says the app's name
         t.animate().translationY(on ? -d(14) : 0).scaleX(on ? 1.12f : 1f).scaleY(on ? 1.12f : 1f)
@@ -698,12 +667,13 @@ public class HomeActivity extends Activity {
         }
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
+        card.setClipChildren(false);   // round letters like S reach a little past the edge: never cut them
         heroTitle = text(168, R.font.outfit_medium, Color.WHITE);
         heroTitle.setTypeface(Typeface.create(getResources().getFont(R.font.outfit_medium), 600, false));
         heroTitle.setLetterSpacing(-0.045f);
         heroTitle.setText(a.label);
         heroTitle.setSingleLine(true);
-        heroTitle.setTranslationX(-0.06f * d(168));
+        heroTitle.setTranslationX(-0.04f * d(168));
         heroLine = text(30, R.font.outfit_light, 0xB8FFFFFF);
         heroLine.setText(Html.fromHtml(lastOpened(a.pkg), Html.FROM_HTML_MODE_LEGACY));
         LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(-2, -2);

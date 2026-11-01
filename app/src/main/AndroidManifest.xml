@@ -48,6 +48,14 @@
             </intent-filter>
         </activity>
 
+        <!-- "Not on Home": the apps taken off the home screen. -->
+        <activity
+            android:name=".LibraryActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
         <!-- The screensaver: the music screen while Spotify, YouTube Music or YouTube plays, the photographs
              otherwise. Set with `settings put secure screensaver_components io.github.hypermix94.vibetv/.MusicDream`. -->
         <service
