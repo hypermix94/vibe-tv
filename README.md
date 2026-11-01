@@ -7,13 +7,20 @@ No ads, no account, nothing to sign in to. Made by Hypermix.</p>
 
 ## At a glance
 
-| What's in | What's not |
-|---|---|
-| A home screen with a dock and every app you use | Ads, suggestions, "continue watching" rows |
-| A music screen for music apps, with lyrics and party mode | A music screen over YouTube or other video apps |
-| A photo screensaver with the time and weather | Any account, sign-in or tracking |
-| An All apps page with search, voice search and a preview panel | A web search or app store of its own |
-| Home settings: name, city, screensaver, dock, icons and more | Phone, Fire TV or Android below 8 |
+**What you get**
+
+- A calm home screen: the day's photo, a greeting, the clock and a dock of your favourite apps
+- Every app you use one press away, plus an All apps page you can search by typing or voice
+- A music screen with lyrics and a party mode, whenever a music app is playing
+- A photo screensaver with the time and the weather
+- Home settings to change your name, city, screensaver, dock and more
+
+**What you don't get**
+
+- No ads, no suggested shows and no "continue watching" rows
+- No music screen over YouTube, Netflix or other video apps
+- No account, no sign-in and no tracking
+- No phones or Fire TV: it is made for Android TV and Google TV, Android 8 or later
 
 ## Home screen
 
