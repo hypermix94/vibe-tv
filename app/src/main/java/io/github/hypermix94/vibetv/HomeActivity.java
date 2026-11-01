@@ -205,7 +205,8 @@ public class HomeActivity extends Activity {
         clock.setClipChildren(false);
         hm = text(96, R.font.outfit_extralight, Color.WHITE);
         hm.setLetterSpacing(-0.04f);
-        hm.setTranslationX(-0.055f * d(96));   // light digits sit a little in from their box
+        hm.setPadding(d(12), 0, 0, 0);   // room inside the box so no digit is cut
+        hm.setTranslationX(-d(12) - 0.055f * d(96));   // light digits sit a little in from their box
         clock.addView(hm);
         LinearLayout sec = new LinearLayout(this);
         sec.setOrientation(LinearLayout.VERTICAL);
@@ -636,8 +637,8 @@ public class HomeActivity extends Activity {
         heading.setSingleLine(true);
         heading.setText(words);
         heading.forceHasOverlappingRendering(false);
-        heading.setPadding(d(24), 0, 0, 0);
-        heading.setTranslationX(-d(24));
+        heading.setPadding(d(24) + d(12), 0, 0, 0);   // room for round first letters inside the box
+        heading.setTranslationX(-d(24) - d(12));
         headingBox.addView(heading, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM | Gravity.START));
         if (animate) {
             heading.setTranslationY(d(20));
@@ -681,7 +682,10 @@ public class HomeActivity extends Activity {
         heroTitle.setLetterSpacing(-0.045f);
         heroTitle.setText(a.label);
         heroTitle.setSingleLine(true);
-        heroTitle.setTranslationX(-0.04f * d(168));
+        // A text box cuts whatever its letters draw past its own edge, and round letters (S, O, C) lean a little
+        // past the left one: give the words room inside the box and move the box back by the same amount.
+        heroTitle.setPadding(d(20), 0, 0, 0);
+        heroTitle.setTranslationX(-d(20) - 0.04f * d(168));
         heroLine = text(30, R.font.outfit_light, 0xB8FFFFFF);
         heroLine.setText(Html.fromHtml(lastOpened(a.pkg), Html.FROM_HTML_MODE_LEGACY));
         LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(-2, -2);
