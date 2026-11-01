@@ -3,6 +3,10 @@
 
     <!-- Lyrics (LRCLIB), weather (Open-Meteo) and the screensaver's photographs (Wikimedia Commons). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- All apps shows each app's size; granted over adb as usage access. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        xmlns:tools="http://schemas.android.com/tools"
+        tools:ignore="ProtectedPermissions" />
     <!-- The Wi-Fi button shows the signal strength. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

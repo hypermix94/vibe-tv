@@ -26,7 +26,7 @@ import java.util.List;
  * Back returns to the home screen, which picks up the changes.
  */
 public class LibraryActivity extends Activity {
-    private static final int COLUMNS = 10;
+    private static final int COLUMNS = 7;   // the preview panel takes the right side
     private static final Interpolator EASE_OUT = new PathInterpolator(0.22f, 1f, 0.36f, 1f);
     private static final Interpolator SPRING = new OvershootInterpolator(1.4f);
 
@@ -41,12 +41,19 @@ public class LibraryActivity extends Activity {
     private FrameLayout nameBox;
     private TextView name;
     private ScrollBar scroll;
+    private AppPreview preview;
+    /** Every app, and the ones the grid shows now (all of them, or those matching the search). */
+    private final List<App> all = new ArrayList<>();
+    private SearchBar search;
+    private boolean onSearch;
+    private int searchFocus;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         s = getResources().getDisplayMetrics().widthPixels / 1920f;
-        apps.addAll(Apps.all(this).values());   // already sorted by name
+        all.addAll(Apps.all(this).values());   // already sorted by name
+        apps.addAll(all);
         setContentView(build());
         Cards.ripple(cards, 0.9f);
         root.post(() -> paint(true));
@@ -73,19 +80,56 @@ public class LibraryActivity extends Activity {
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);
         column.setClipChildren(false);
-        TextView title = Cards.text(this, s, 30, R.font.outfit_regular, 0xB8FFFFFF);
+        // "All apps" on the left, the search on the right.
+        FrameLayout head = new FrameLayout(this);
+        head.setClipChildren(false);
+        TextView title = Cards.text(this, s, 48, R.font.outfit_medium, Color.WHITE);
         title.setText("All apps");
-        column.addView(title);
+        title.setLetterSpacing(-0.02f);
+        head.addView(title, new FrameLayout.LayoutParams(-2, -2, Gravity.START | Gravity.CENTER_VERTICAL));
+        search = new SearchBar(this, s, this::filter, this::searchDone);
+        head.addView(search, new FrameLayout.LayoutParams(d(560), d(68), Gravity.END | Gravity.CENTER_VERTICAL));
+        column.addView(head, new LinearLayout.LayoutParams(-1, d(80)));
         nameBox = new FrameLayout(this);
         nameBox.setClipChildren(false);
         // Tall enough for the big name and the room around it on every side, so no letter is cut.
         LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(-1, d(118));
         nameLp.topMargin = d(10);
         column.addView(nameBox, nameLp);
+        nameBox.setVisibility(View.GONE);   // the preview panel carries the focused app's name
 
         grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
         grid.setClipChildren(false);
+        buildGrid();
+        LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1, -2);
+        gridLp.topMargin = d(30);
+        gridLp.leftMargin = -d(20);   // icons sit centred in their places: line the first up with the title
+        gridLp.rightMargin = -d(20);
+        column.addView(grid, gridLp);
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
+        lp.setMargins(d(112), d(96), d(112 + 520 + 48), 0);
+        root.addView(column, lp);
+        // On the right: the focused app at a glance.
+        preview = new AppPreview(this, s);
+        FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(d(520), -1, Gravity.END);
+        pLp.setMargins(0, d(96), d(112), d(96));
+        root.addView(preview, pLp);
+        scroll = new ScrollBar(this, s);   // on the right: where in the apps the remote is
+        FrameLayout.LayoutParams barLp = new FrameLayout.LayoutParams(d(20), -1, Gravity.END);
+        barLp.setMargins(0, d(200), d(112 + 520 + 14), d(96));
+        root.addView(scroll, barLp);
+        column.setAlpha(0f);
+        column.setTranslationY(d(28));
+        column.animate().alpha(1f).translationY(0).setDuration(700).setInterpolator(EASE_OUT).start();
+        return root;
+    }
+
+    /** Fills the grid with the apps shown now. */
+    private void buildGrid() {
+        grid.removeAllViews();
+        cards.clear();
         LinearLayout row = null;
         for (int i = 0; i < apps.size(); i++) {
             if (i % COLUMNS == 0) {
@@ -109,26 +153,70 @@ public class LibraryActivity extends Activity {
                 row.addView(new View(this), lp);
             }
         }
-        LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1, -2);
-        gridLp.topMargin = d(30);
-        column.addView(grid, gridLp);
+    }
 
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
-        lp.setMargins(d(112), d(96), d(112), 0);
-        root.addView(column, lp);
-        scroll = new ScrollBar(this, s);   // on the right: where in the apps the remote is
-        FrameLayout.LayoutParams barLp = new FrameLayout.LayoutParams(d(20), -1, Gravity.END);
-        barLp.setMargins(0, d(270), d(48), d(80));
-        root.addView(scroll, barLp);
-        column.setAlpha(0f);
-        column.setTranslationY(d(28));
-        column.animate().alpha(1f).translationY(0).setDuration(700).setInterpolator(EASE_OUT).start();
-        return root;
+    /** The search's words changed: show only the apps whose names contain them. */
+    private void filter(String q) {
+        String needle = q.trim().toLowerCase(java.util.Locale.ROOT);
+        apps.clear();
+        for (App a : all) if (needle.isEmpty() || a.label.toLowerCase(java.util.Locale.ROOT).contains(needle)) apps.add(a);
+        focus = 0;
+        buildGrid();
+        Cards.ripple(cards, 0.9f);
+        paint(true);
+    }
+
+    /** Typing or speaking finished: go to the results, if there are any. */
+    private void searchDone() {
+        if (!apps.isEmpty()) {
+            onSearch = false;
+            search.focus(-1);
+            focus = 0;
+        }
+        paint(true);
+    }
+
+    @Override
+    protected void onDestroy() {
+        search.release();
+        super.onDestroy();
     }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int k = e.getKeyCode();
+        if (search.typing()) {   // the on-screen keyboard has the keys; Back finishes typing
+            if (k == KeyEvent.KEYCODE_BACK && e.getAction() == KeyEvent.ACTION_UP) search.stopTyping();
+            return k == KeyEvent.KEYCODE_BACK || super.dispatchKeyEvent(e);
+        }
+        if (k == KeyEvent.KEYCODE_SEARCH || k == KeyEvent.KEYCODE_VOICE_ASSIST || k == KeyEvent.KEYCODE_ASSIST) {
+            if (e.getAction() == KeyEvent.ACTION_UP) {   // the remote's voice button: straight to listening
+                onSearch = true;
+                searchFocus = 1;
+                search.voice();
+            }
+            return true;
+        }
+        if (onSearch) {
+            boolean okKey = k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER || k == KeyEvent.KEYCODE_NUMPAD_ENTER;
+            if (okKey) {
+                if (e.getAction() == KeyEvent.ACTION_UP) search.press();
+                return true;
+            }
+            if (e.getAction() != KeyEvent.ACTION_DOWN) return true;
+            if (k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                searchFocus = k == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : 0;
+                search.focus(searchFocus);
+            } else if (k == KeyEvent.KEYCODE_DPAD_DOWN && !apps.isEmpty()) {
+                onSearch = false;
+                search.focus(-1);
+                paint(true);
+            } else if (k == KeyEvent.KEYCODE_BACK) {
+                if (!search.query().isEmpty()) search.clear();
+                else finish();
+            }
+            return true;
+        }
         boolean ok = k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER || k == KeyEvent.KEYCODE_NUMPAD_ENTER;
         if (ok) {
             if (e.getAction() == KeyEvent.ACTION_DOWN) {
@@ -156,7 +244,14 @@ public class LibraryActivity extends Activity {
             }
             return true;
         }
-        if (apps.isEmpty()) return super.dispatchKeyEvent(e);
+        if (apps.isEmpty()) {
+            if (k == KeyEvent.KEYCODE_DPAD_UP) {
+                onSearch = true;
+                search.focus(searchFocus);
+                return true;
+            }
+            return super.dispatchKeyEvent(e);
+        }
         int col = focus % COLUMNS;
         switch (k) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
@@ -166,7 +261,15 @@ public class LibraryActivity extends Activity {
                 if (col < COLUMNS - 1 && focus + 1 < apps.size()) focus++;
                 break;
             case KeyEvent.KEYCODE_DPAD_UP:
-                if (focus >= COLUMNS) focus -= COLUMNS;
+                if (focus >= COLUMNS) {
+                    focus -= COLUMNS;
+                } else {   // above the first row: the search
+                    onSearch = true;
+                    searchFocus = 0;
+                    search.focus(0);
+                    paint(true);
+                    return true;
+                }
                 break;
             case KeyEvent.KEYCODE_DPAD_DOWN:
                 if (focus + COLUMNS < apps.size()) focus += COLUMNS;
@@ -265,7 +368,7 @@ public class LibraryActivity extends Activity {
     private void paint(boolean animate) {
         long ms = animate ? 420 : 0;
         for (int i = 0; i < cards.size(); i++) {
-            boolean on = i == focus;
+            boolean on = i == focus && !onSearch;
             FrameLayout c = cards.get(i);
             Object was = c.getTag(R.id.focused);
             if (animate && was != null && (Boolean) was == on) continue;   // unchanged: leave its ripple alone
@@ -276,14 +379,19 @@ public class LibraryActivity extends Activity {
             Cards.focus(c, on, ms);
             if (on && animate) c.announceForAccessibility(c.getContentDescription());
         }
-        if (!apps.isEmpty()) swapName(apps.get(focus).label, animate);
+        if (!apps.isEmpty()) {
+            App a = apps.get(focus);
+            String where = Apps.dockOrder(this).contains(a.pkg) ? "In the dock"
+                    : Apps.hidden(this).contains(a.pkg) ? "Not on Home" : "On Home";
+            preview.show(a, where, animate);
+        }
         int row = focus / COLUMNS;
         int rows = (apps.size() + COLUMNS - 1) / COLUMNS;
         if (scroll != null && !apps.isEmpty()) {
             scroll.show(true, animate);
-            scroll.set(rows, 4, Math.max(0, row - 3), animate);
+            scroll.set(rows, 5, Math.max(0, row - 4), animate);
         }
-        grid.animate().translationY(-Math.max(0, row - 3) * d(170)).setDuration(animate ? 600 : 0).setInterpolator(EASE_OUT).start();
+        grid.animate().translationY(-Math.max(0, row - 4) * d(170)).setDuration(animate ? 600 : 0).setInterpolator(EASE_OUT).start();
     }
 
     /** The focused app's name: the old one lifts away as the new one rises in. */
