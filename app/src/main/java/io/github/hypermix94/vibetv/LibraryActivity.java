@@ -107,11 +107,18 @@ public class LibraryActivity extends Activity {
         grid.setOrientation(LinearLayout.VERTICAL);
         grid.setClipChildren(false);
         buildGrid();
-        LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1, -2);
-        gridLp.topMargin = d(30);
-        gridLp.leftMargin = -d(20);   // icons sit centred in their places: line the first up with the title
-        gridLp.rightMargin = -d(20);
-        column.addView(grid, gridLp);
+        // The icons scroll inside their own window under the header: the title, the search and the big name stay
+        // put. The window starts a little above the first row and is padded, so a lifted icon is never cut.
+        FrameLayout window = new FrameLayout(this);
+        window.setClipChildren(true);
+        window.setClipToPadding(false);
+        window.setPadding(0, d(24), 0, d(24));
+        window.addView(grid, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
+        int above = 96 + 80 + (withPreview ? 0 : 128) + 6;   // the header's height on the 1080 grid
+        LinearLayout.LayoutParams winLp = new LinearLayout.LayoutParams(-1, d(1080 - above - 40));
+        winLp.leftMargin = -d(20);   // icons sit centred in their places: line the first up with the title
+        winLp.rightMargin = -d(20);
+        column.addView(window, winLp);
 
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
         lp.setMargins(d(112), d(96), d(withPreview ? 112 + 520 + 48 : 112), 0);
@@ -396,9 +403,9 @@ public class LibraryActivity extends Activity {
         int rows = (apps.size() + COLUMNS - 1) / COLUMNS;
         if (scroll != null && !apps.isEmpty()) {
             scroll.show(true, animate);
-            scroll.set(rows, 5, Math.max(0, row - 4), animate);
+            scroll.set(rows, visibleRows(), Math.max(0, row - (visibleRows() - 1)), animate);
         }
-        grid.animate().translationY(-Math.max(0, row - 4) * d(170)).setDuration(animate ? 600 : 0).setInterpolator(EASE_OUT).start();
+        grid.animate().translationY(-Math.max(0, row - (visibleRows() - 1)) * d(170)).setDuration(animate ? 600 : 0).setInterpolator(EASE_OUT).start();
     }
 
     /** The focused app's name: the old one lifts away as the new one rises in. */
@@ -428,6 +435,12 @@ public class LibraryActivity extends Activity {
             name.setAlpha(0f);
             name.animate().translationY(0).alpha(1f).setDuration(520).setInterpolator(EASE_OUT).start();
         }
+    }
+
+    /** How many rows of icons fit in the window under the header. */
+    private int visibleRows() {
+        int above = 96 + 80 + (withPreview ? 0 : 128) + 6;
+        return Math.max(1, (1080 - above - 40 - 48) / 170);
     }
 
     private int d(float designPx) {
