@@ -100,7 +100,8 @@ public class LibraryActivity extends Activity {
         LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(-1, d(118));
         nameLp.topMargin = d(10);
         column.addView(nameBox, nameLp);
-        nameBox.setVisibility(View.GONE);   // the preview panel carries the focused app's name
+        // With the preview panel on, it carries the focused app's name; without it, the name shows here, large.
+        nameBox.setVisibility(withPreview ? View.GONE : View.VISIBLE);
 
         grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
@@ -389,6 +390,7 @@ public class LibraryActivity extends Activity {
             String where = Apps.dockOrder(this).contains(a.pkg) ? "In the dock"
                     : Apps.hidden(this).contains(a.pkg) ? "Not on Home" : "On Home";
             if (withPreview) preview.show(a, where, animate);
+            else swapName(a.label, animate);
         }
         int row = focus / COLUMNS;
         int rows = (apps.size() + COLUMNS - 1) / COLUMNS;
