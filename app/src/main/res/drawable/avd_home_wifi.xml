@@ -17,25 +17,25 @@
     <target android:name="dot">
         <aapt:attr name="android:animation">
             <objectAnimator android:propertyName="fillAlpha" android:valueFrom="0.2" android:valueTo="1"
-                android:valueType="floatType" android:duration="250" />
+                android:valueType="floatType" android:duration="375" />
         </aapt:attr>
     </target>
     <target android:name="arc1">
         <aapt:attr name="android:animation">
             <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0.2" android:valueTo="1"
-                android:valueType="floatType" android:startOffset="180" android:duration="280" />
+                android:valueType="floatType" android:startOffset="270" android:duration="420" />
         </aapt:attr>
     </target>
     <target android:name="arc2">
         <aapt:attr name="android:animation">
             <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0.2" android:valueTo="1"
-                android:valueType="floatType" android:startOffset="360" android:duration="280" />
+                android:valueType="floatType" android:startOffset="540" android:duration="420" />
         </aapt:attr>
     </target>
     <target android:name="arc3">
         <aapt:attr name="android:animation">
             <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0.2" android:valueTo="1"
-                android:valueType="floatType" android:startOffset="540" android:duration="280" />
+                android:valueType="floatType" android:startOffset="810" android:duration="420" />
         </aapt:attr>
     </target>
 </animated-vector>

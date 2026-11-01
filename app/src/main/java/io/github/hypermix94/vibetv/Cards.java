@@ -13,13 +13,16 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 /**
- * App cards: the app's icon, large and centred, on a deep tint of the icon's own colour; no words on the card (the
- * focused app's name shows above the grid). All the same size, so a page of apps reads as one calm grid. Sizes are on the 1920 x 1080
+ * App cards, minimal and flat: a warm charcoal card with a hairline border, the app's icon in a pale well of its
+ * own colour, and no words (the focused app's name shows above the grid). Focus turns the card bone-white. All the
+ * same size, so a page of apps reads as one calm grid. Sizes are on the 1920 x 1080
  * design grid; {@code s} turns them into screen pixels.
  */
 final class Cards {
-    static final int SURFACE = 0xFF2A2D35;
-    static final int RADIUS = 16;
+    static final int SURFACE = 0xEB1B1A19;   // warm charcoal, a touch see-through over the photo
+    static final int FOCUSED = 0xFFF7F6F3;   // bone white
+    static final int BORDER = 0x14FFFFFF;    // a hairline
+    static final int RADIUS = 12;
 
     private Cards() {
     }
@@ -49,35 +52,77 @@ final class Cards {
         t.invalidate();
     }
 
-    /** A card for an app: its icon, large, on a deep tint of the icon's own colour. The name shows above the grid. */
+    /** A card for an app: its icon in a pale well of its own colour, on a quiet charcoal card. No words. */
     static FrameLayout app(Context c, float s, Apps.App a) {
         ImageView icon = new ImageView(c);
         icon.setImageDrawable(a.icon);
-        icon.setOutlineProvider(rounded(s, 18));
+        icon.setOutlineProvider(rounded(s, 14));
         icon.setClipToOutline(true);
-        return card(c, s, icon, tint(a.icon), a.label, 76);
+        return card(c, s, icon, pastel(tint(a.icon)), a.label, 60);
     }
 
-    /** A card for something that is not an app ("All apps"): a white line icon on the plain surface. */
+    /** A card for something that is not an app ("All apps"): a line icon in a neutral well. */
     static FrameLayout action(Context c, float s, int iconRes, String label) {
         ImageView icon = new ImageView(c);
         icon.setImageResource(iconRes);
-        icon.setColorFilter(Color.WHITE);
-        return card(c, s, icon, SURFACE, label, 52);
+        icon.setColorFilter(0xFF2F3437);
+        icon.setPadding(d(s, 8), d(s, 8), d(s, 8), d(s, 8));
+        return card(c, s, icon, 0xFFE9E7E2, label, 60);
     }
 
-    private static FrameLayout card(Context c, float s, ImageView icon, int colour, String label, int iconPx) {
+    /** Charcoal card, hairline border, crisp corners; the icon sits in a soft well in the middle. */
+    private static FrameLayout card(Context c, float s, ImageView icon, int well, String label, int iconPx) {
         FrameLayout t = new FrameLayout(c);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(colour);
+        bg.setColor(SURFACE);
         bg.setCornerRadius(d(s, RADIUS));
+        bg.setStroke(Math.max(1, d(s, 1)), BORDER);
         t.setBackground(bg);
+        t.setTag(bg);   // its surface turns bone-white on focus (see focus())
         t.setOutlineProvider(rounded(s, RADIUS));
         t.setClipToOutline(true);
-        t.addView(icon, new FrameLayout.LayoutParams(d(s, iconPx), d(s, iconPx), Gravity.CENTER));
+        FrameLayout pocket = new FrameLayout(c);
+        GradientDrawable w = new GradientDrawable();
+        w.setColor(well);
+        w.setCornerRadius(d(s, 20));
+        pocket.setBackground(w);
+        pocket.addView(icon, new FrameLayout.LayoutParams(d(s, iconPx), d(s, iconPx), Gravity.CENTER));
+        t.addView(pocket, new FrameLayout.LayoutParams(d(s, 88), d(s, 88), Gravity.CENTER));
         t.setContentDescription(label);
-        focusRing(t, s);
+        t.setForeground(new GradientDrawable());   // kept so callers can treat every tile alike
+        t.getForeground().setAlpha(0);
         return t;
+    }
+
+    /**
+     * Focus for a card: the charcoal surface turns bone-white (and the border fades), a calm, unmistakable change at
+     * ten feet. Tiles without a card surface (dock banners) keep their white ring instead.
+     */
+    static void focus(View t, boolean on, long ms) {
+        if (!(t.getTag() instanceof GradientDrawable)) {
+            if (t.getForeground() != null) t.getForeground().setAlpha(on ? 255 : 0);
+            return;
+        }
+        GradientDrawable bg = (GradientDrawable) t.getTag();
+        Integer was = (Integer) t.getTag(R.id.card_colour);
+        int from = was != null ? was : SURFACE, to = on ? FOCUSED : SURFACE;
+        t.setTag(R.id.card_colour, to);
+        if (from == to) return;
+        android.animation.ValueAnimator a = android.animation.ValueAnimator.ofObject(
+                new android.animation.ArgbEvaluator(), from, to);
+        a.setDuration(ms);
+        a.addUpdateListener(v -> bg.setColor((int) v.getAnimatedValue()));
+        a.start();
+    }
+
+    /** A washed-out pastel of a colour: mostly bone-white with a hint of the hue. */
+    static int pastel(int colour) {
+        if (colour == SURFACE) return 0xFFE9E7E2;
+        float[] hsv = new float[3];
+        Color.colorToHSV(colour, hsv);
+        hsv[1] = Math.min(0.28f, hsv[1] * 0.45f);
+        hsv[2] = 0.95f;
+        return Color.HSVToColor(hsv);
     }
 
     /**

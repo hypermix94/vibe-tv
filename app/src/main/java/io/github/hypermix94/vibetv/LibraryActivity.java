@@ -263,7 +263,7 @@ public class LibraryActivity extends Activity {
             c.animate().translationY(on ? -d(10) : 0).scaleX(on ? 1.1f : 1f).scaleY(on ? 1.1f : 1f)
                     .alpha(on ? 1f : 0.9f).setDuration(ms).setInterpolator(SPRING).start();
             c.setTranslationZ(on ? 1 : 0);
-            c.getForeground().setAlpha(on ? 255 : 0);
+            Cards.focus(c, on, ms);
             if (on && animate) c.announceForAccessibility(c.getContentDescription());
         }
         if (!apps.isEmpty()) swapName(apps.get(focus).label, animate);

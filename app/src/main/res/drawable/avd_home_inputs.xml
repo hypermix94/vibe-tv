@@ -16,14 +16,14 @@
     <target android:name="arrow">
         <aapt:attr name="android:animation">
             <objectAnimator android:propertyName="translateX" android:valueFrom="-6" android:valueTo="0"
-                android:valueType="floatType" android:duration="650"
+                android:valueType="floatType" android:duration="975"
                 android:interpolator="@android:interpolator/decelerate_cubic" />
         </aapt:attr>
     </target>
     <target android:name="arrowPath">
         <aapt:attr name="android:animation">
             <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0" android:valueTo="1"
-                android:valueType="floatType" android:duration="450" />
+                android:valueType="floatType" android:duration="675" />
         </aapt:attr>
     </target>
 </animated-vector>

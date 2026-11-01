@@ -568,7 +568,7 @@ public class HomeActivity extends Activity {
 
     /** Lifts the focused tile or button and settles everything else; slides the page for the apps. */
     private void paintFocus(boolean animate) {
-        long tile = animate ? 420 : 0, slow = animate ? 650 : 0;
+        long tile = animate ? 420 : 0, slow = animate ? 900 : 0;   // the top-right buttons move unhurried
         for (int i = 0; i < dockTiles.size(); i++) {
             boolean on = zone == Zone.DOCK && i == dockFocus;
             lift(dockTiles.get(i), on, 0.78f, tile);
@@ -653,7 +653,7 @@ public class HomeActivity extends Activity {
                 .alpha(on ? 1f : restAlpha).setDuration(ms).setInterpolator(SPRING).start();
         t.setElevation(on ? d(24) : 0);
         t.setTranslationZ(on ? 1 : 0);
-        t.getForeground().setAlpha(on ? 255 : 0);
+        Cards.focus(t, on, ms);   // cards turn bone-white; dock banners show their white ring
     }
 
     /** The big name of the focused dock app: the old one lifts away, the new one rises in. */
