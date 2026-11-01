@@ -69,7 +69,27 @@ final class MusicScreen extends android.content.ContextWrapper {
 
     /** The apps whose music shows here. */
     static final List<String> MUSIC_APPS = Arrays.asList(
-            "com.spotify.tv.android", "com.google.android.youtube.tvmusic", "com.google.android.youtube.tv");
+            "com.spotify.tv.android", "com.spotify.music", "com.google.android.youtube.tvmusic",
+            "com.google.android.apps.youtube.music", "com.apple.android.music", "com.amazon.mp3",
+            "com.jio.media.jiobeats", "com.gaana", "com.bsbportal.music", "com.aspiro.tidal", "deezer.android.tv",
+            "deezer.android.app", "com.soundcloud.android", "com.pandora.android.atv", "com.pandora.android",
+            "com.clearchannel.iheartradio.controller");
+
+    /** Video apps play sound too, but they are for watching: the music screen never covers them. */
+    private static final List<String> VIDEO_APPS = Arrays.asList(
+            "com.google.android.youtube.tv", "com.google.android.youtube", "com.netflix.ninja",
+            "com.amazon.amazonvideo.livingroom", "in.startv.hotstar", "com.graymatrix.did");
+
+    /** A music app: one of the known ones, or any app that calls itself an audio app; never a video app. */
+    static boolean isMusicApp(Context c, String pkg) {
+        if (VIDEO_APPS.contains(pkg)) return false;
+        if (MUSIC_APPS.contains(pkg)) return true;
+        try {
+            return c.getPackageManager().getApplicationInfo(pkg, 0).category == android.content.pm.ApplicationInfo.CATEGORY_AUDIO;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
 
     /** Material's standard ease: quick to start, long gentle settle. */
     private static final android.view.animation.Interpolator EASE =
@@ -196,7 +216,7 @@ final class MusicScreen extends android.content.ContextWrapper {
             MediaSessionManager sessions = context.getSystemService(MediaSessionManager.class);
             for (MediaController c : sessions.getActiveSessions(new ComponentName(context, NowPlayingListener.class))) {
                 PlaybackState s = c.getPlaybackState();
-                if (MUSIC_APPS.contains(c.getPackageName()) && s != null && s.getState() == PlaybackState.STATE_PLAYING) {
+                if (isMusicApp(context, c.getPackageName()) && s != null && s.getState() == PlaybackState.STATE_PLAYING) {
                     return c;
                 }
             }
