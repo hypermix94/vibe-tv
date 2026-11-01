@@ -1,0 +1,43 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.hypermix94.vibetv'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'io.github.hypermix94.vibetv'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+
+        // The screensaver's weather place, from local.properties (never committed), e.g.
+        //   vibetv.weatherPlace=London
+        //   vibetv.weatherLatitude=51.5072
+        //   vibetv.weatherLongitude=-0.1276
+        // Left out: no weather.
+        def local = new Properties()
+        def localFile = rootProject.file('local.properties')
+        if (localFile.exists()) localFile.withInputStream { local.load(it) }
+        resValue 'string', 'weather_place', local.getProperty('vibetv.weatherPlace', '')
+        resValue 'string', 'weather_latitude', local.getProperty('vibetv.weatherLatitude', '')
+        resValue 'string', 'weather_longitude', local.getProperty('vibetv.weatherLongitude', '')
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Installed over ADB, not from a store: signed with the debug key.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

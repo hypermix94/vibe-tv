@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Lyrics (LRCLIB), weather (Open-Meteo) and the screensaver's photographs (Wikimedia Commons). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Party mode and the moving background hear what the TV plays, through Android's Visualizer. No microphone. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Granted over adb: lets the music screen pause Android's 24-hour attentive timeout while music plays. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        xmlns:tools="http://schemas.android.com/tools"
+        tools:ignore="ProtectedPermissions" />
+
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true">
+
+        <!-- The screensaver: the music screen while Spotify, YouTube Music or YouTube plays, the photographs
+             otherwise. Set with `settings put secure screensaver_components io.github.hypermix94.vibetv/.MusicDream`. -->
+        <service
+            android:name=".MusicDream"
+            android:label="@string/app_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <!-- Reads what is playing (and keeps each app's last picture). Granted with `cmd notification allow_listener`;
+             notifications themselves are never read. -->
+        <service
+            android:name=".NowPlayingListener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>
