@@ -51,18 +51,24 @@ final class Lyrics {
 
     static final Lyrics NONE = new Lyrics(new ArrayList<>(), false);
 
+    private static final long MISS_AGE_MS = 3L * 24 * 60 * 60 * 1000;
+    /** Versions of a song that keep its words: " - Slowed", "(Sped Up)", " - Remastered 2011", "(Live)" and so on. */
+    private static final String VERSION =
+            "(slowed|sped ?up|reverb|nightcore|remaster(ed)?|live|radio edit|acoustic|remix|version|edit|mono|stereo)";
     private static final Pattern STAMP = Pattern.compile("\\[(\\d+):(\\d+)(?:[.:](\\d+))?\\]");
 
-    /** Looks the song up (cache first). Runs on a background thread. */
+    /** Looks the song up (cache first); null when the library could not be asked (offline or busy). Background thread. */
     static Lyrics find(Context context, String title, String artist, String album, long durationMs) {
         String song = cleanTitle(title), who = firstArtist(artist);
         if (song.isEmpty()) return NONE;
         File dir = new File(context.getFilesDir(), "lyrics");
-        File cache = new File(dir, Integer.toHexString((song + "|" + who).toLowerCase(Locale.ROOT).hashCode()) + ".v3.txt");
+        File cache = new File(dir, Integer.toHexString((song + "|" + who).toLowerCase(Locale.ROOT).hashCode()) + ".v4.txt");
         String raw = read(cache);
+        // A song the library did not have is asked about again after a few days: lyrics get added all the time.
+        if (raw != null && raw.startsWith("N") && System.currentTimeMillis() - cache.lastModified() > MISS_AGE_MS) raw = null;
         if (raw == null) {
             raw = fetch(song, who, album, durationMs);
-            if (raw == null) return NONE;   // could not ask (offline or busy): try again next time
+            if (raw == null) return null;   // could not ask (offline or busy): the caller asks again shortly
             if (dir.isDirectory() || dir.mkdirs()) write(cache, raw);
         }
         return parse(raw);
@@ -72,7 +78,9 @@ final class Lyrics {
     static String cleanTitle(String title) {
         if (title == null) return "";
         String t = title.replaceAll("(?i)\\s*[-–]\\s*from\\s+.*$", "")
-                .replaceAll("(?i)\\s*[(\\[](feat|ft|from|with)\\b.*?[)\\]]", "");
+                .replaceAll("(?i)\\s*[(\\[](feat|ft|from|with)\\b.*?[)\\]]", "")
+                .replaceAll("(?i)\\s*[-–]\\s*[^-–]*\\b" + VERSION + "\\b.*$", "")
+                .replaceAll("(?i)\\s*[(\\[][^)\\]]*\\b" + VERSION + "\\b[^)\\]]*[)\\]]", "");
         return t.trim();
     }
 
@@ -94,6 +102,17 @@ final class Lyrics {
             String list = get("https://lrclib.net/api/search?track_name=" + enc(song) + "&artist_name=" + enc(who));
             if (list == null) return exact;
             JSONArray results = new JSONArray(list);
+            if (results.length() == 0) {
+                // Nothing under that artist (credited differently, or a cover): a free-text search, keeping only
+                // results with the same song name so a different song is never shown.
+                String loose = get("https://lrclib.net/api/search?q=" + enc(song + " " + who));
+                JSONArray all = loose != null && !loose.isEmpty() ? new JSONArray(loose) : new JSONArray();
+                results = new JSONArray();
+                for (int i = 0; i < all.length(); i++) {
+                    JSONObject o = all.getJSONObject(i);
+                    if (cleanTitle(o.optString("trackName")).equalsIgnoreCase(song)) results.put(o);
+                }
+            }
             String best = exact;
             int bestRank = rank(exact);
             for (int i = 0; i < results.length(); i++) {

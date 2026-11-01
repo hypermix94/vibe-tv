@@ -102,13 +102,14 @@ final class MusicScreen extends android.content.ContextWrapper {
     /** Which bottom button Left and Right have picked: 0 Lyrics, 1 Party. */
     private int picked;
     private WaveProgress wave;
+    private GlideText titleGlide, artistGlide;
     /** The elapsed and remaining times under the timeline. */
     private LinearLayout times;
     private boolean lyricsOn;
     private Lyrics lyrics = Lyrics.NONE;
     /** True while the current song's lyrics are being looked up: "Finding the lyrics…", not the no-lyrics joke. */
     private boolean lyricsLoading;
-    private String songKey = "";
+    private volatile String songKey = "";   // read by the lyrics thread too
     private int currentLine = -1;
     private final List<TextView> lineViews = new ArrayList<>();
 
@@ -306,18 +307,17 @@ final class MusicScreen extends android.content.ContextWrapper {
         side.addView(cover, new LinearLayout.LayoutParams(px(260), px(260)));
         title = text(21f, R.font.outfit_medium, Color.WHITE, true);
         title.setTypeface(lyricFace());
-        // A long name scrolls slowly across instead of being cut short.
-        title.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
-        title.setMarqueeRepeatLimit(-1);
-        title.setHorizontalFadingEdgeEnabled(true);
+        // A long name glides slowly to its end, comes back, rests two seconds and goes again.
         title.setFadingEdgeLength(px(24));
-        title.setSelected(true);   // marquee runs on a selected view; nothing here takes focus
+        titleGlide = new GlideText(title);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
         titleLp.topMargin = px(18);
         side.addView(title, titleLp);
         artist = text(13f, R.font.outfit_regular, 0xB3FFFFFF, true);
         LinearLayout.LayoutParams artistLp = new LinearLayout.LayoutParams(-1, -2);
         artistLp.topMargin = px(3);
+        artist.setFadingEdgeLength(px(24));
+        artistGlide = new GlideText(artist);
         side.addView(artist, artistLp);
 
         // The timeline: a flowing wave for the part played, in the cover's second colour.
@@ -426,9 +426,8 @@ final class MusicScreen extends android.content.ContextWrapper {
         CharSequence by = m.getString(MediaMetadata.METADATA_KEY_ARTIST);
         if (by == null && d != null) by = d.getSubtitle();
         String who = by != null ? by.toString() : "";
-        title.setText(name);
-        title.setSelected(true);
-        artist.setText(who);
+        titleGlide.setText(name);
+        artistGlide.setText(who);
         Bitmap art = null;
         for (String k : new String[]{MediaMetadata.METADATA_KEY_ALBUM_ART, MediaMetadata.METADATA_KEY_ART,
                 MediaMetadata.METADATA_KEY_DISPLAY_ICON}) {
@@ -453,10 +452,22 @@ final class MusicScreen extends android.content.ContextWrapper {
         String album = m.getString(MediaMetadata.METADATA_KEY_ALBUM);
         long duration = m.getLong(MediaMetadata.METADATA_KEY_DURATION);
         new Thread(() -> {
-            Lyrics found = Lyrics.find(this, name, who, album, duration);
+            // The library is often busy: keep "Finding the lyrics" up and ask again every 20 seconds, for a few minutes.
+            Lyrics found = null;
+            for (int attempt = 0; attempt < 10 && key.equals(songKey); attempt++) {
+                found = Lyrics.find(this, name, who, album, duration);
+                if (found != null) break;
+                try {
+                    Thread.sleep(20_000L);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+            if (found == null) found = Lyrics.NONE;
+            Lyrics result = found;
             main.post(() -> {
                 if (!key.equals(songKey)) return;   // the song changed in the meantime
-                lyrics = found;
+                lyrics = result;
                 lyricsLoading = false;
                 showLyricsLines();
             });
