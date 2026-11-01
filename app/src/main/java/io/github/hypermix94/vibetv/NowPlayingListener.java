@@ -24,9 +24,20 @@ import java.util.concurrent.Executors;
  * Keeps the last "now playing" picture and title of every app (NowPlaying), from the apps' media sessions, for the
  * music screen; its notification access also lets the music screen read what is playing. A picture the app hands over is saved as is; an app that only gives a web link has that one
  * image downloaded, once per link. Bound by Android only while notification access is granted
- * (cmd notification allow_listener); notifications themselves are never read.
+ * (cmd notification allow_listener). Notifications are not read, except those of timers and alarms (Clocks), for the
+ * home screen's clock.
  */
 public class NowPlayingListener extends NotificationListenerService {
+
+    @Override
+    public void onNotificationPosted(android.service.notification.StatusBarNotification n) {
+        if (Clocks.isTimer(n)) Clocks.posted(n);   // every other notification is ignored
+    }
+
+    @Override
+    public void onNotificationRemoved(android.service.notification.StatusBarNotification n) {
+        Clocks.removed(n);
+    }
 
     private static final String TAG = "NowPlaying";
     private static final String[] BITMAP_KEYS = {
@@ -46,6 +57,14 @@ public class NowPlayingListener extends NotificationListenerService {
 
     @Override
     public void onListenerConnected() {
+        // Timers and alarms for the home screen's clock: only those notifications are looked at (Clocks.isTimer).
+        try {
+            for (android.service.notification.StatusBarNotification n : getActiveNotifications()) {
+                if (Clocks.isTimer(n)) Clocks.posted(n);
+            }
+        } catch (RuntimeException ignored) {
+            // not bound yet
+        }
         sessions = getSystemService(MediaSessionManager.class);
         ComponentName me = new ComponentName(this, NowPlayingListener.class);
         sessions.addOnActiveSessionsChangedListener(onChange, me);

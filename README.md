@@ -87,7 +87,9 @@ If you ever want your TV's own home screen back, choose it as Home in Settings, 
   - the weather, from [Open-Meteo](https://open-meteo.com);
   - the photographs, from [Wikimedia Commons](https://commons.wikimedia.org);
   - the animated greeting characters, from Google's Noto emoji.
-- **The music screen only hears what the TV is playing,** through Android's Visualizer. It never uses a microphone.
+- **The music screen only hears what the TV is playing,** through Android's Visualizer. The microphone is used only
+  when you press the mic to search for an app.
+- **Notifications are not read,** except those of timers and alarms, so the clock can show them.
 
 ## Licence
 

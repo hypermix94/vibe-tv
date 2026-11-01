@@ -109,7 +109,10 @@ final class AppPreview extends FrameLayout {
         try {
             PackageInfo info = context.getPackageManager().getPackageInfo(a.pkg, 0);
             values[4].setText(info.versionName != null ? info.versionName : "—");
-            values[5].setText(DateFormat.format("d MMMM yyyy", info.firstInstallTime));
+            boolean system = (info.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+            // Apps built into the TV report a placeholder factory date (often 2009): say so instead.
+            values[5].setText(system && info.firstInstallTime < 1_420_070_400_000L ? "Came with the TV"
+                    : DateFormat.format("d MMMM yyyy", info.firstInstallTime));
         } catch (PackageManager.NameNotFoundException e) {
             values[4].setText("—");
             values[5].setText("—");

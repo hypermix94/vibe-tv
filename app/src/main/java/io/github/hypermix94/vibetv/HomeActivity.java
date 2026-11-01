@@ -70,6 +70,10 @@ public class HomeActivity extends Activity {
     private boolean longPressed;
     private WifiIcon wifiIcon;
     private ScrollBar scroll;
+    /** What the line under the clock shows: 0 the date, 1 the next alarm, 2 a running timer. */
+    private int lineKind = -1;
+    /** The dark plate behind the clock when it has focus (as a shortcut to the timer or alarm). */
+    private View clockPlate;
     /** The apps the grid shows now: every app on Home, or those matching the search. */
     private final List<App> grid = new ArrayList<>();
     private LinearLayout gridRows;
@@ -232,6 +236,14 @@ public class HomeActivity extends Activity {
         LinearLayout.LayoutParams dateLp = new LinearLayout.LayoutParams(-2, -2);
         dateLp.topMargin = d(10);
         top.addView(date, dateLp);
+        clockPlate = new View(this);
+        GradientDrawable plateBg = new GradientDrawable();
+        plateBg.setColor(Cards.PLATE);
+        plateBg.setCornerRadius(d(26));
+        plateBg.setStroke(Math.max(1, d(1)), Cards.BORDER);
+        clockPlate.setBackground(plateBg);
+        clockPlate.setAlpha(0f);
+        page.addView(clockPlate, at(d(10), d(10), Gravity.TOP | Gravity.START, 112, 64, 0, 0));
         page.addView(top, at(d(1000), -2, Gravity.TOP | Gravity.START, 112, 64, 0, 0));
         top.setTag("rise:80");
 
@@ -475,7 +487,8 @@ public class HomeActivity extends Activity {
                 Cards.ripple(appTiles, 0.9f);   // the icons arrive one after another
             }
         } else if (zone == Zone.TOP) {
-            if (dx != 0) actionFocus = Math.max(0, Math.min(actions.size() - 1, actionFocus + dx));
+            int lowest = lineKind > 0 ? -1 : 0;   // the clock is a shortcut while a timer or alarm is set
+            if (dx != 0) actionFocus = Math.max(lowest, Math.min(actions.size() - 1, actionFocus + dx));
             else if (dy > 0) zone = Zone.DOCK;
         } else {
             int cards = appTiles.size(), col = appFocus % COLUMNS, rowIndex = appFocus / COLUMNS;
@@ -502,6 +515,8 @@ public class HomeActivity extends Activity {
             bounce(appTiles.get(appFocus));
             if (appFocus < grid.size()) open(grid.get(appFocus));
             else startActivity(new Intent(this, LibraryActivity.class));   // the "All apps" page
+        } else if (actionFocus < 0) {
+            Clocks.open(this);
         } else {
             openSetting(actionFocus);
         }
@@ -622,7 +637,18 @@ public class HomeActivity extends Activity {
             boolean on = zone == Zone.APPS && i == appFocus;
             lift(appTiles.get(i), on, 0.9f, tile);
         }
-        int lit = zone == Zone.TOP ? actionFocus : -1;
+        boolean onClock = zone == Zone.TOP && actionFocus < 0;
+        if (onClock) {   // size the plate to the clock block, with room around it
+            View block = (View) hm.getParent().getParent();
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) clockPlate.getLayoutParams();
+            lp.width = block.getWidth() > 0 ? Math.min(block.getWidth(), d(520)) + d(48) : d(480);
+            lp.height = block.getHeight() + d(36);
+            lp.leftMargin = d(112) - d(24);
+            lp.topMargin = d(64) - d(18);
+            clockPlate.setLayoutParams(lp);
+        }
+        clockPlate.animate().alpha(onClock ? 1f : 0f).setDuration(slow).start();
+        int lit = zone == Zone.TOP && actionFocus >= 0 ? actionFocus : -1;
         if (lit != litAction) paintActions(lit, slow);
         litAction = lit;
         // Down to the apps: the page slides up, the words above fade, and the picture dims.
@@ -826,7 +852,25 @@ public class HomeActivity extends Activity {
                 seconds.setAlpha(0.55f);
                 seconds.animate().alpha(1f).setDuration(380).setInterpolator(EASE_OUT).start();
             }
-            date.setText(DateFormat.format("EEEE, d MMMM", now));
+            // Under the clock: the date, or the next alarm, or a running timer; a change of kind slides in.
+            String line = Clocks.line(HomeActivity.this);
+            int kind = Clocks.kind(HomeActivity.this);
+            String words = line != null ? line : DateFormat.format("EEEE, d MMMM", now).toString();
+            if (lineKind >= 0 && kind != lineKind) {
+                date.animate().translationY(-d(18)).alpha(0f).setDuration(300).setInterpolator(EASE_OUT).withEndAction(() -> {
+                    date.setText(words);
+                    date.setTranslationY(d(18));
+                    date.animate().translationY(0).alpha(1f).setDuration(450).setInterpolator(EASE_OUT).start();
+                }).start();
+            } else if (!words.contentEquals(date.getText())) {
+                date.setText(words);
+            }
+            date.setTextColor(kind > 0 ? Color.WHITE : 0xB8FFFFFF);
+            if (kind == 0 && zone == Zone.TOP && actionFocus < 0) {   // nothing set any more: off the clock
+                actionFocus = 0;
+                paintFocus(true);
+            }
+            lineKind = kind;
             if (DateFormat.format("ss", now).toString().equals("00")) greetingLine();
             if (wifiIcon != null && now.getTime() / 1000 % 10 == 0) wifiIcon.refresh();
             main.postDelayed(this, 1000 - System.currentTimeMillis() % 1000 + 10);
