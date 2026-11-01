@@ -41,7 +41,7 @@ import java.util.Map;
  * The remote is handled here directly (Left, Right, Up, Down, OK), so focus goes exactly where the design says.
  */
 public class HomeActivity extends Activity {
-    private static final int DOCK = 6, COLUMNS = 6;
+    private static final int DOCK = 6, COLUMNS = 10;
     private static final Interpolator EASE_OUT = new PathInterpolator(0.22f, 1f, 0.36f, 1f);
     private static final Interpolator SPRING = new OvershootInterpolator(1.4f);
 
@@ -306,22 +306,22 @@ public class HomeActivity extends Activity {
             if (i % COLUMNS == 0) {
                 row = new LinearLayout(this);
                 row.setClipChildren(false);
-                LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, d(144));
-                rowLp.topMargin = d(30);
+                LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, d(156));   // phone-tight rows
+                rowLp.topMargin = d(14);
                 apps.addView(row, rowLp);
             }
             FrameLayout t = i < others.size() ? Cards.app(this, s, others.get(i))
                     : Cards.action(this, s, R.drawable.ic_apps_more, "All apps");
             t.setAlpha(0.9f);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1f);
-            if (i % COLUMNS > 0) lp.leftMargin = d(32);
+            if (i % COLUMNS > 0) lp.leftMargin = d(12);
             row.addView(t, lp);
             appTiles.add(t);
         }
         if (row != null) {
             for (int i = cards % COLUMNS; i > 0 && i < COLUMNS; i++) {   // keep the last row's tiles the same width
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1f);
-                lp.leftMargin = d(32);
+                lp.leftMargin = d(12);
                 row.addView(new View(this), lp);
             }
         }
@@ -585,7 +585,7 @@ public class HomeActivity extends Activity {
         boolean inApps = zone == Zone.APPS;
         swapHeading(!inApps ? "Apps" : appFocus < others.size() ? others.get(appFocus).label : "All apps", animate);
         int row = inApps ? appFocus / COLUMNS : 0;
-        float pageY = inApps ? -d(700) - Math.max(0, row - 1) * d(174) : 0;
+        float pageY = inApps ? -d(700) - Math.max(0, row - 1) * d(170) : 0;
         page.animate().translationY(pageY).setDuration(animate ? 700 : 0).setInterpolator(EASE_OUT).start();
         for (View v : new View[]{heroBox, (View) hm.getParent().getParent(), (View) actions.get(0).getParent()}) {
             v.animate().alpha(inApps ? 0f : 1f).setDuration(animate ? 500 : 0).start();

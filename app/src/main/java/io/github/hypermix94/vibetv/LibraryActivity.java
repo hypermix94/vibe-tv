@@ -26,7 +26,7 @@ import java.util.List;
  * Back returns to the home screen, which picks up the changes.
  */
 public class LibraryActivity extends Activity {
-    private static final int COLUMNS = 6;
+    private static final int COLUMNS = 10;
     private static final Interpolator EASE_OUT = new PathInterpolator(0.22f, 1f, 0.36f, 1f);
     private static final Interpolator SPRING = new OvershootInterpolator(1.4f);
 
@@ -89,21 +89,21 @@ public class LibraryActivity extends Activity {
             if (i % COLUMNS == 0) {
                 row = new LinearLayout(this);
                 row.setClipChildren(false);
-                LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, d(144));
-                rowLp.topMargin = d(30);
+                LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, d(156));
+                rowLp.topMargin = d(14);
                 grid.addView(row, rowLp);
             }
             FrameLayout c = Cards.app(this, s, apps.get(i));
             c.setAlpha(0.9f);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1f);
-            if (i % COLUMNS > 0) lp.leftMargin = d(32);
+            if (i % COLUMNS > 0) lp.leftMargin = d(12);
             row.addView(c, lp);
             cards.add(c);
         }
         if (row != null) {
             for (int i = apps.size() % COLUMNS; i > 0 && i < COLUMNS; i++) {
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1f);
-                lp.leftMargin = d(32);
+                lp.leftMargin = d(12);
                 row.addView(new View(this), lp);
             }
         }
@@ -272,7 +272,7 @@ public class LibraryActivity extends Activity {
         }
         if (!apps.isEmpty()) swapName(apps.get(focus).label, animate);
         int row = focus / COLUMNS;
-        grid.animate().translationY(-Math.max(0, row - 2) * d(174)).setDuration(animate ? 600 : 0).setInterpolator(EASE_OUT).start();
+        grid.animate().translationY(-Math.max(0, row - 3) * d(170)).setDuration(animate ? 600 : 0).setInterpolator(EASE_OUT).start();
     }
 
     /** The focused app's name: the old one lifts away as the new one rises in. */

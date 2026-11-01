@@ -65,7 +65,7 @@ final class Cards {
         ImageView icon = new ImageView(c);
         icon.setImageResource(iconRes);
         icon.setColorFilter(Color.WHITE);
-        int pad = d(s, 26);
+        int pad = d(s, 30);
         icon.setPadding(pad, pad, pad, pad);
         return cell(c, s, icon, label, 0xFF3A3B40);
     }
@@ -84,17 +84,17 @@ final class Cards {
         p.setStroke(Math.max(1, d(s, 1)), BORDER);
         plate.setBackground(p);
         plate.setAlpha(0f);
-        t.addView(plate, new FrameLayout.LayoutParams(d(s, 140), d(s, 140), Gravity.CENTER));
+        t.addView(plate, new FrameLayout.LayoutParams(d(s, 148), d(s, 148), Gravity.CENTER));
         if (iconBackground != 0) {
             GradientDrawable bg = new GradientDrawable();
             bg.setColor(iconBackground);
-            bg.setCornerRadius(d(s, 24));
+            bg.setCornerRadius(d(s, 27));
             icon.setBackground(bg);
         }
-        icon.setOutlineProvider(rounded(s, 24));
+        icon.setOutlineProvider(rounded(s, 27));
         icon.setClipToOutline(true);
         icon.setElevation(d(s, 6));
-        t.addView(icon, new FrameLayout.LayoutParams(d(s, 104), d(s, 104), Gravity.CENTER));
+        t.addView(icon, new FrameLayout.LayoutParams(d(s, 116), d(s, 116), Gravity.CENTER));
         t.setTag(R.id.plate, plate);
         t.setContentDescription(label);
         t.setForeground(new GradientDrawable());   // kept so callers can treat every tile alike
