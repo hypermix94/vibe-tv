@@ -82,6 +82,18 @@ public class SettingsActivity extends Activity {
                 if (!Prefs.setScreensaverMinutes(SettingsActivity.this, v)) toast("The TV did not allow this change");
             }
         });
+        rows.add(new SwitchRow("Music screen", "set_music_screen", Prefs.musicScreen(this)) {
+            @Override
+            void changed() {
+                if (!Prefs.applyScreensaver(SettingsActivity.this)) toast("The TV did not allow this change");
+            }
+        });
+        rows.add(new SwitchRow("Photo screensaver", "set_photos", Prefs.photos(this)) {
+            @Override
+            void changed() {
+                if (!Prefs.applyScreensaver(SettingsActivity.this)) toast("The TV did not allow this change");
+            }
+        });
         rows.add(new ChoiceRow("Dock holds up to", new int[]{4, 5, 6, 7, 8, 9, 10}, Prefs.dockMax(SettingsActivity.this), " apps") {
             @Override
             void apply(int v) {
@@ -484,7 +496,12 @@ public class SettingsActivity extends Activity {
             if (v == on) return;
             on = v;
             show(true);
-            Prefs.edit(SettingsActivity.this).putBoolean(key, on).apply();
+            Prefs.edit(SettingsActivity.this).putBoolean(key, on).commit();
+            changed();
+        }
+
+        /** After the switch is saved. */
+        void changed() {
         }
     }
 

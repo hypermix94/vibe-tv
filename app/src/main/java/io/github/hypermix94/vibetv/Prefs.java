@@ -54,6 +54,33 @@ final class Prefs {
         return p(c).getBoolean("set_preview", true);
     }
 
+    /** The music screen: the album when music plays. Off, the photographs show instead (if they are on). */
+    static boolean musicScreen(Context c) {
+        return p(c).getBoolean("set_music_screen", true);
+    }
+
+    /** The photographs screensaver, when no music plays (or the music screen is off). */
+    static boolean photos(Context c) {
+        return p(c).getBoolean("set_photos", true);
+    }
+
+    /**
+     * With both screensavers off the TV's screensaver is switched off, and the TV is kept on while it has power (so it
+     * never goes to sleep instead); with either on, the screensaver is switched back on. Needs WRITE_SECURE_SETTINGS,
+     * which install.sh grants. False when the TV refused.
+     */
+    static boolean applyScreensaver(Context c) {
+        boolean any = musicScreen(c) || photos(c);
+        try {
+            android.content.ContentResolver r = c.getContentResolver();
+            android.provider.Settings.Secure.putInt(r, "screensaver_enabled", any ? 1 : 0);
+            android.provider.Settings.Global.putInt(r, android.provider.Settings.Global.STAY_ON_WHILE_PLUGGED_IN, any ? 0 : 7);
+            return true;
+        } catch (SecurityException e) {
+            return false;
+        }
+    }
+
     /** Minutes without a button press before the screensaver (music screen or photographs). */
     static int screensaverMinutes(Context c) {
         try {

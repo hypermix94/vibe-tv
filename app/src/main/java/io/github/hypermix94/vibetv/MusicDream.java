@@ -18,10 +18,11 @@ import android.widget.TextView;
 import java.util.Date;
 
 /**
- * The screensaver. If Spotify, YouTube Music or YouTube is playing, it shows MusicScreen (the cover, lyrics and party
- * mode) inside itself. Otherwise it shows Scenery's pictures of nature, landscapes, the sea and space, a new one every
+ * The screensaver. If a music app is playing, it shows MusicScreen (the cover, lyrics and party mode) inside itself. Otherwise it shows Scenery's pictures of nature, landscapes, the sea and space, a new one every
  * 90 seconds with a slow crossfade and drift, the time at the bottom left and the weather at the bottom right; and if
- * music starts meanwhile, it switches to the music screen.
+ * music starts meanwhile, it switches to the music screen. Either can be switched off in Home settings: with the music
+ * screen off the photographs show while music plays too, and with the photographs off and no music it wakes the TV
+ * straight back to what was on screen. (With both off, Home settings switches the TV's screensaver off.)
  */
 public class MusicDream extends DreamService {
     private static final long CHANGE_MS = 90_000L;
@@ -43,7 +44,8 @@ public class MusicDream extends DreamService {
         setInteractive(false);
         setFullscreen(true);
         if (openMusic()) return;
-        showScenery();
+        if (Prefs.photos(this)) showScenery();
+        // else nothing to show: onDreamingStarted wakes the TV straight back
     }
 
     private void showScenery() {
@@ -59,7 +61,7 @@ public class MusicDream extends DreamService {
      * sleep. With the TV's sleep timer off it runs as long as the music does.
      */
     private boolean openMusic() {
-        if (MusicScreen.playingMusic(this) == null) return false;
+        if (!Prefs.musicScreen(this) || MusicScreen.playingMusic(this) == null) return false;
         MusicScreen screen = new MusicScreen(this, new MusicScreen.Host() {
             @Override
             public android.view.Window window() {
@@ -105,11 +107,17 @@ public class MusicDream extends DreamService {
             music.resume();
             return;
         }
-        if (layers == null) return;
+        if (layers == null) {
+            // The photographs are off and no music plays: back to what was on screen. Waking counts as activity, so
+            // the TV stays on rather than going to sleep, as it would if the screensaver simply ended.
+            if (android.os.Build.VERSION.SDK_INT >= 29) wakeUp();
+            else finish();
+            return;
+        }
         running = true;
         tick.run();
         nextPicture();
-        main.postDelayed(watchMusic, MUSIC_CHECK_MS);
+        if (Prefs.musicScreen(this)) main.postDelayed(watchMusic, MUSIC_CHECK_MS);
         showWeather(weather.cached());
         weather.refresh(this::showWeather);
     }
