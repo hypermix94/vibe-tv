@@ -636,7 +636,6 @@ public class HomeActivity extends Activity {
         heading.setLetterSpacing(-0.02f);
         heading.setSingleLine(true);
         heading.setText(words);
-        Cards.softCorners(heading, s);
         heading.forceHasOverlappingRendering(false);
         heading.setPadding(d(24) + d(12), 0, 0, 0);   // room for round first letters inside the box
         heading.setTranslationX(-d(24) - d(12));

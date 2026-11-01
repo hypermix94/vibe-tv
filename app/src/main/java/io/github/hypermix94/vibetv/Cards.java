@@ -45,7 +45,7 @@ final class Cards {
         android.graphics.Paint p = t.getPaint();
         p.setStyle(android.graphics.Paint.Style.FILL_AND_STROKE);
         p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
-        p.setStrokeWidth(d(s, 4));
+        p.setStrokeWidth(t.getTextSize() * 0.024f);   // in step with the size: heavy outlines blur smaller words
         t.invalidate();
     }
 
