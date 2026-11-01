@@ -241,7 +241,7 @@ public class HomeActivity extends Activity {
         sec.addView(ampm);
         LinearLayout.LayoutParams secLp = new LinearLayout.LayoutParams(-2, -2);
         secLp.leftMargin = d(10);
-        secLp.topMargin = d(14);
+        secLp.topMargin = d(24);   // the seconds' top meets the top of the digits
         clock.addView(sec, secLp);
         LinearLayout.LayoutParams clockLp = new LinearLayout.LayoutParams(-2, -2);
         clockLp.topMargin = d(6);
@@ -268,14 +268,30 @@ public class HomeActivity extends Activity {
             ImageView icon = new ImageView(this);
             icon.setImageResource(icons[i]);
             icon.setColorFilter(Color.WHITE);
-            b.addView(icon, new FrameLayout.LayoutParams(d(34), d(34), Gravity.CENTER));
+            b.addView(icon, new FrameLayout.LayoutParams(d(40), d(40), Gravity.CENTER));
+            b.setContentDescription(new String[]{"Inputs", "Wi-Fi", "Settings"}[i]);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(d(72), d(72));
             if (i > 0) lp.leftMargin = d(18);
             acts.addView(b, lp);
             b.setTag("rise:" + (360 + 80 * i));
             actions.add(b);
         }
-        page.addView(acts, at(-2, -2, Gravity.TOP | Gravity.END, 0, 122, 112, 0));
+        page.addView(acts, at(-2, -2, Gravity.TOP | Gravity.END, 0, 0, 112, 0));
+        // The buttons sit level with the middle of the clock's digits, measured once laid out.
+        acts.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                acts.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                // Layout positions, not screen ones: the entrance animation is still moving things at this point.
+                View clockRow = (View) hm.getParent(), topBlock = (View) clockRow.getParent();
+                float hmTop = topBlock.getTop() + clockRow.getTop() + hm.getTop();
+                float clockMid = hmTop + hm.getBaseline() - hm.getTextSize() * 0.36f;   // middle of the digits
+                float actsMid = acts.getTop() + acts.getHeight() / 2f;
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) acts.getLayoutParams();
+                lp.topMargin += Math.round(clockMid - actsMid);
+                acts.setLayoutParams(lp);
+            }
+        });
 
         // The focused app's name, large, and when it was last opened.
         heroBox = new FrameLayout(this);
@@ -287,7 +303,7 @@ public class HomeActivity extends Activity {
         dockRow.setClipToPadding(false);
         for (int i = 0; i < dock.size(); i++) {
             FrameLayout t = tile(dock.get(i), true);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, d(149), 1f);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, d(144), 1f);   // 16:9, like TV banners
             if (i > 0) lp.leftMargin = d(32);
             dockRow.addView(t, lp);
             t.setTag("rise:" + (420 + 70 * i));
@@ -308,7 +324,7 @@ public class HomeActivity extends Activity {
             if (i % COLUMNS == 0) {
                 row = new LinearLayout(this);
                 row.setClipChildren(false);
-                LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, d(150));
+                LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, d(144));
                 rowLp.topMargin = d(30);
                 apps.addView(row, rowLp);
             }
@@ -328,7 +344,7 @@ public class HomeActivity extends Activity {
         // The "Apps" heading peeks above the bottom edge, so there is plainly more below the dock.
         page.addView(apps, at(-1, -2, Gravity.TOP, 112, 1000, 112, 0));
 
-        credit = text(15, R.font.outfit_regular, 0x80FFFFFF);
+        credit = text(18, R.font.outfit_regular, 0xB3FFFFFF);
         root.addView(credit, at(-2, -2, Gravity.BOTTOM | Gravity.END, 0, 0, 112, 40));
 
         greetingLine();
@@ -367,6 +383,7 @@ public class HomeActivity extends Activity {
         t.setForeground(ring);
         t.getForeground().setAlpha(0);
         t.setAlpha(inDock ? 0.78f : 0.9f);
+        t.setContentDescription(a.label);
         return t;
     }
 
@@ -621,7 +638,7 @@ public class HomeActivity extends Activity {
         // Down to the apps: the page slides up, the words above fade, and the picture dims.
         boolean inApps = zone == Zone.APPS;
         int row = inApps ? appFocus / COLUMNS : 0;
-        float pageY = inApps ? -d(700) - Math.max(0, row - 1) * d(180) : 0;
+        float pageY = inApps ? -d(700) - Math.max(0, row - 1) * d(174) : 0;
         page.animate().translationY(pageY).setDuration(animate ? 700 : 0).setInterpolator(EASE_OUT).start();
         for (View v : new View[]{heroBox, (View) hm.getParent().getParent(), (View) actions.get(0).getParent()}) {
             v.animate().alpha(inApps ? 0f : 1f).setDuration(animate ? 500 : 0).start();
@@ -658,6 +675,7 @@ public class HomeActivity extends Activity {
     }
 
     private void lift(View t, boolean on, float restAlpha, long ms) {
+        if (on && ms > 0) t.announceForAccessibility(t.getContentDescription());   // TalkBack says the app's name
         t.animate().translationY(on ? -d(14) : 0).scaleX(on ? 1.12f : 1f).scaleY(on ? 1.12f : 1f)
                 .alpha(on ? 1f : restAlpha).setDuration(ms).setInterpolator(SPRING).start();
         t.setElevation(on ? d(24) : 0);
@@ -689,7 +707,7 @@ public class HomeActivity extends Activity {
         heroLine = text(30, R.font.outfit_light, 0xB8FFFFFF);
         heroLine.setText(Html.fromHtml(lastOpened(a.pkg), Html.FROM_HTML_MODE_LEGACY));
         LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(-2, -2);
-        lineLp.topMargin = d(22);
+        lineLp.topMargin = d(10);
         card.addView(heroTitle, new LinearLayout.LayoutParams(-1, -2));
         card.addView(heroLine, lineLp);
         heroBox.addView(card, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM | Gravity.START));
