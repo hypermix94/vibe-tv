@@ -3,6 +3,9 @@
 
     <!-- Lyrics (LRCLIB), weather (Open-Meteo) and the screensaver's photographs (Wikimedia Commons). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The Wi-Fi button shows the signal strength. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Party mode and the moving background hear what the TV plays, through Android's Visualizer. No microphone. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />

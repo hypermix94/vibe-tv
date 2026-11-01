@@ -68,6 +68,7 @@ public class HomeActivity extends Activity {
     /** Moving a dock app: Left and Right shift it along the dock, OK or Back sets it down. */
     private boolean moving;
     private boolean longPressed;
+    private WifiIcon wifiIcon;
     private FrameLayout headingBox;
     private TextView heading;
     /** The dock and hidden apps as they were when this screen was built. */
@@ -230,8 +231,7 @@ public class HomeActivity extends Activity {
 
         // Top right: Inputs, Wi-Fi, Settings.
         LinearLayout acts = new LinearLayout(this);
-        int[] icons = {R.drawable.avd_home_inputs, R.drawable.avd_home_wifi, R.drawable.avd_home_settings};
-        for (int i = 0; i < icons.length; i++) {
+        for (int i = 0; i < 3; i++) {
             FrameLayout b = new FrameLayout(this);
             View disc = new View(this);
             GradientDrawable circle = new GradientDrawable();
@@ -240,9 +240,9 @@ public class HomeActivity extends Activity {
             disc.setBackground(circle);
             disc.setAlpha(0f);
             b.addView(disc, match());
-            ImageView icon = new ImageView(this);
-            icon.setImageResource(icons[i]);
-            icon.setColorFilter(Color.WHITE);
+            // Drawn icons, so each motion ends in a solid colour: Inputs, a live Wi-Fi signal meter, Settings.
+            View icon = i == 1 ? (wifiIcon = new WifiIcon(this))
+                    : new ActionIcon(this, i == 0 ? ActionIcon.INPUTS : ActionIcon.SETTINGS);
             b.addView(icon, new FrameLayout.LayoutParams(d(40), d(40), Gravity.CENTER));
             b.setContentDescription(new String[]{"Inputs", "Wi-Fi", "Settings"}[i]);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(d(72), d(72));
@@ -598,23 +598,29 @@ public class HomeActivity extends Activity {
             FrameLayout b = actions.get(i);
             boolean on = i == lit, was = i == litAction;
             View disc = b.getChildAt(0);
-            ImageView icon = (ImageView) b.getChildAt(1);
+            View icon = b.getChildAt(1);
             disc.animate().alpha(on ? 1f : 0f).setDuration(slow).setInterpolator(EASE_OUT).start();
             b.animate().scaleX(on ? 1.08f : 1f).scaleY(on ? 1.08f : 1f).setDuration(slow).setInterpolator(EASE_OUT).start();
             ValueAnimator tint = ValueAnimator.ofObject(new ArgbEvaluator(), on ? Color.WHITE : Color.BLACK, on ? Color.BLACK : Color.WHITE);
             tint.setDuration(slow);
-            tint.addUpdateListener(a -> icon.setColorFilter((int) a.getAnimatedValue()));
+            tint.addUpdateListener(a -> {
+                int col = (int) a.getAnimatedValue();
+                if (icon instanceof WifiIcon) ((WifiIcon) icon).setColour(col);
+                else ((ActionIcon) icon).setColour(col);
+            });
             if (on != was) tint.start();
             // Each icon plays its own short animation once on focus: the arrow slides in, the Wi-Fi signal fills up,
             // the slider knobs glide. Leaving puts it back.
-            if (on != was && icon.getDrawable() instanceof android.graphics.drawable.AnimatedVectorDrawable) {
-                android.graphics.drawable.AnimatedVectorDrawable avd =
-                        (android.graphics.drawable.AnimatedVectorDrawable) icon.getDrawable();
-                if (on) {
-                    avd.reset();
-                    avd.start();
+            if (on != was) {
+                if (icon instanceof WifiIcon) {
+                    WifiIcon w = (WifiIcon) icon;
+                    w.refresh();
+                    if (on) w.play();
+                    else w.settle();
+                } else if (on) {
+                    ((ActionIcon) icon).play();
                 } else {
-                    avd.reset();
+                    ((ActionIcon) icon).settle();
                 }
             }
         }
@@ -685,8 +691,10 @@ public class HomeActivity extends Activity {
         heroTitle.setSingleLine(true);
         // A text box cuts whatever its letters draw past its own edge, and round letters (S, O, C) lean a little
         // past the left one: give the words room inside the box and move the box back by the same amount.
-        heroTitle.setPadding(d(20), 0, 0, 0);
-        heroTitle.setTranslationX(-d(20) - 0.04f * d(168));
+        // Room on every side: the rounding outline draws a little outside the letters' measured shape, and a text box
+        // cuts whatever falls outside it. The box is moved back only by its padding, so whole letters always show.
+        heroTitle.setPadding(d(28), d(12), d(28), d(12));
+        heroTitle.setTranslationX(-d(28));
         heroLine = text(30, R.font.outfit_light, 0xB8FFFFFF);
         heroLine.setText(Html.fromHtml(lastOpened(a.pkg), Html.FROM_HTML_MODE_LEGACY));
         LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(-2, -2);
@@ -769,6 +777,7 @@ public class HomeActivity extends Activity {
             }
             date.setText(DateFormat.format("EEEE, d MMMM", now));
             if (DateFormat.format("ss", now).toString().equals("00")) greetingLine();
+            if (wifiIcon != null && now.getTime() / 1000 % 10 == 0) wifiIcon.refresh();
             main.postDelayed(this, 1000 - System.currentTimeMillis() % 1000 + 10);
         }
     };
