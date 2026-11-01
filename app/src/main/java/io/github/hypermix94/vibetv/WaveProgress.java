@@ -9,7 +9,7 @@ import android.view.View;
 
 /**
  * The music screen's timeline: the part already played is a gently flowing wave, the rest a thin straight line, with a
- * white dot riding the tip, like Android's own media player. The wave moves only while the song plays, at about 30 frames a second.
+ * dot of the same colour riding the tip, like Android's own media player. The wave moves only while the song plays, at about 30 frames a second.
  */
 final class WaveProgress extends View {
     private final Paint played = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -41,6 +41,7 @@ final class WaveProgress extends View {
 
     void setColour(int colour) {
         played.setColor(colour);
+        dot.setColor(colour);   // the playhead matches the wave
         invalidate();
     }
 
@@ -70,7 +71,7 @@ final class WaveProgress extends View {
                 else path.lineTo(i, y);
             }
             c.drawPath(path, played);
-            // The playhead: a white dot riding the tip of the wave.
+            // The playhead: a dot riding the tip of the wave.
             float tipY = mid + amplitude * (float) Math.sin((x - phase) / wavelength * 2 * Math.PI);
             c.drawCircle(x, tipY, dotRadius, dot);
         }

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inputs: on focus the arrow slides into the screen. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:pathData="M9,5H19A2,2 0 0 1 21,7V17A2,2 0 0 1 19,19H9" android:strokeColor="#FFFFFFFF"
+                android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" />
+            <group android:name="arrow">
+                <path android:name="arrowPath" android:pathData="M3,12H14M10.5,8.5L14,12L10.5,15.5"
+                    android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round"
+                    android:strokeLineJoin="round" />
+            </group>
+        </vector>
+    </aapt:attr>
+    <target android:name="arrow">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="translateX" android:valueFrom="-6" android:valueTo="0"
+                android:valueType="floatType" android:duration="650"
+                android:interpolator="@android:interpolator/decelerate_cubic" />
+        </aapt:attr>
+    </target>
+    <target android:name="arrowPath">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0" android:valueTo="1"
+                android:valueType="floatType" android:duration="450" />
+        </aapt:attr>
+    </target>
+</animated-vector>

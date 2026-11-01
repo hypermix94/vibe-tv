@@ -21,6 +21,11 @@ android {
         def local = new Properties()
         def localFile = rootProject.file('local.properties')
         if (localFile.exists()) localFile.withInputStream { local.load(it) }
+        // The owner's name for the greeting, and the dock's apps (package names, comma-separated), e.g.
+        //   vibetv.name=Alex
+        //   vibetv.dock=com.netflix.ninja,com.google.android.youtube.tv
+        resValue 'string', 'owner_name', local.getProperty('vibetv.name', '')
+        resValue 'string', 'dock_apps', local.getProperty('vibetv.dock', '')
         resValue 'string', 'weather_place', local.getProperty('vibetv.weatherPlace', '')
         resValue 'string', 'weather_latitude', local.getProperty('vibetv.weatherLatitude', '')
         resValue 'string', 'weather_longitude', local.getProperty('vibetv.weatherLongitude', '')

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings: on focus the three slider knobs glide to new places. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:pathData="M4,6H20M4,12H20M4,18H20" android:strokeColor="#FFFFFFFF" android:strokeWidth="2"
+                android:strokeLineCap="round" />
+            <group android:name="knob1">
+                <path android:pathData="M9,6m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0" android:fillColor="#FFFFFFFF" />
+            </group>
+            <group android:name="knob2">
+                <path android:pathData="M15,12m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0" android:fillColor="#FFFFFFFF" />
+            </group>
+            <group android:name="knob3">
+                <path android:pathData="M8,18m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0" android:fillColor="#FFFFFFFF" />
+            </group>
+        </vector>
+    </aapt:attr>
+    <target android:name="knob1">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="translateX" android:valueFrom="0" android:valueTo="6"
+                android:valueType="floatType" android:duration="700"
+                android:interpolator="@android:interpolator/fast_out_slow_in" />
+        </aapt:attr>
+    </target>
+    <target android:name="knob2">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="translateX" android:valueFrom="0" android:valueTo="-7"
+                android:valueType="floatType" android:startOffset="90" android:duration="700"
+                android:interpolator="@android:interpolator/fast_out_slow_in" />
+        </aapt:attr>
+    </target>
+    <target android:name="knob3">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="translateX" android:valueFrom="0" android:valueTo="7"
+                android:valueType="floatType" android:startOffset="180" android:duration="700"
+                android:interpolator="@android:interpolator/fast_out_slow_in" />
+        </aapt:attr>
+    </target>
+</animated-vector>
