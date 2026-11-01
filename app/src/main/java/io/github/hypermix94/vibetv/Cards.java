@@ -13,14 +13,14 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 /**
- * App cards, minimal and flat: a warm charcoal card with a hairline border, the app's icon in a pale well of its
- * own colour, and no words (the focused app's name shows above the grid). Focus turns the card bone-white. All the
- * same size, so a page of apps reads as one calm grid. Sizes are on the 1920 x 1080
+ * Apps as on a phone: each app's own icon, large, in a rounded square, with no card and no words (the focused
+ * app's name shows above the grid). Focus lifts the icon with a spring onto a dark plate; icons ripple in when the
+ * grid appears. Sizes are on the 1920 x 1080
  * design grid; {@code s} turns them into screen pixels.
  */
 final class Cards {
     static final int SURFACE = 0xEB1B1A19;   // warm charcoal, a touch see-through over the photo
-    static final int FOCUSED = 0xFFF7F6F3;   // bone white
+    static final int PLATE = 0xE6232428;     // the dark plate behind a focused icon
     static final int BORDER = 0x14FFFFFF;    // a hairline
     static final int RADIUS = 12;
 
@@ -52,42 +52,50 @@ final class Cards {
         t.invalidate();
     }
 
-    /** A card for an app: its icon in a pale well of its own colour, on a quiet charcoal card. No words. */
+    /** An app as on a phone: its own icon, large, in a rounded square. No card and no words. */
     static FrameLayout app(Context c, float s, Apps.App a) {
         ImageView icon = new ImageView(c);
         icon.setImageDrawable(a.icon);
-        icon.setOutlineProvider(rounded(s, 14));
-        icon.setClipToOutline(true);
-        return card(c, s, icon, pastel(tint(a.icon)), a.label, 60);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        return cell(c, s, icon, a.label, 0);
     }
 
-    /** A card for something that is not an app ("All apps"): a line icon in a neutral well. */
+    /** "All apps", drawn like an app icon: a grid glyph in a dark rounded square. */
     static FrameLayout action(Context c, float s, int iconRes, String label) {
         ImageView icon = new ImageView(c);
         icon.setImageResource(iconRes);
-        icon.setColorFilter(0xFF2F3437);
-        icon.setPadding(d(s, 8), d(s, 8), d(s, 8), d(s, 8));
-        return card(c, s, icon, 0xFFE9E7E2, label, 60);
+        icon.setColorFilter(Color.WHITE);
+        int pad = d(s, 26);
+        icon.setPadding(pad, pad, pad, pad);
+        return cell(c, s, icon, label, 0xFF3A3B40);
     }
 
-    /** Charcoal card, hairline border, crisp corners; the icon sits in a soft well in the middle. */
-    private static FrameLayout card(Context c, float s, ImageView icon, int well, String label, int iconPx) {
+    /**
+     * One place in the grid: a dark plate (shown on focus) behind an icon in a rounded square. {@link #focus} fades the
+     * plate in; the screen showing the grid lifts and scales the whole place.
+     */
+    private static FrameLayout cell(Context c, float s, ImageView icon, String label, int iconBackground) {
         FrameLayout t = new FrameLayout(c);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(SURFACE);
-        bg.setCornerRadius(d(s, RADIUS));
-        bg.setStroke(Math.max(1, d(s, 1)), BORDER);
-        t.setBackground(bg);
-        t.setTag(bg);   // its surface turns bone-white on focus (see focus())
-        t.setOutlineProvider(rounded(s, RADIUS));
-        t.setClipToOutline(true);
-        FrameLayout pocket = new FrameLayout(c);
-        GradientDrawable w = new GradientDrawable();
-        w.setColor(well);
-        w.setCornerRadius(d(s, 20));
-        pocket.setBackground(w);
-        pocket.addView(icon, new FrameLayout.LayoutParams(d(s, iconPx), d(s, iconPx), Gravity.CENTER));
-        t.addView(pocket, new FrameLayout.LayoutParams(d(s, 88), d(s, 88), Gravity.CENTER));
+        t.setClipChildren(false);
+        View plate = new View(c);
+        GradientDrawable p = new GradientDrawable();
+        p.setColor(PLATE);
+        p.setCornerRadius(d(s, 30));
+        p.setStroke(Math.max(1, d(s, 1)), BORDER);
+        plate.setBackground(p);
+        plate.setAlpha(0f);
+        t.addView(plate, new FrameLayout.LayoutParams(d(s, 140), d(s, 140), Gravity.CENTER));
+        if (iconBackground != 0) {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(iconBackground);
+            bg.setCornerRadius(d(s, 24));
+            icon.setBackground(bg);
+        }
+        icon.setOutlineProvider(rounded(s, 24));
+        icon.setClipToOutline(true);
+        icon.setElevation(d(s, 6));
+        t.addView(icon, new FrameLayout.LayoutParams(d(s, 104), d(s, 104), Gravity.CENTER));
+        t.setTag(R.id.plate, plate);
         t.setContentDescription(label);
         t.setForeground(new GradientDrawable());   // kept so callers can treat every tile alike
         t.getForeground().setAlpha(0);
@@ -95,68 +103,29 @@ final class Cards {
     }
 
     /**
-     * Focus for a card: the charcoal surface turns bone-white (and the border fades), a calm, unmistakable change at
-     * ten feet. Tiles without a card surface (dock banners) keep their white ring instead.
+     * Focus: an app icon gets a dark plate behind it (the screen lifts and scales it, with a spring); a dock banner,
+     * which has no plate, shows its white ring instead.
      */
     static void focus(View t, boolean on, long ms) {
-        if (!(t.getTag() instanceof GradientDrawable)) {
-            if (t.getForeground() != null) t.getForeground().setAlpha(on ? 255 : 0);
-            return;
+        Object plate = t.getTag(R.id.plate);
+        if (plate instanceof View) {
+            ((View) plate).animate().alpha(on ? 1f : 0f).setDuration(ms).start();
+        } else if (t.getForeground() != null) {
+            t.getForeground().setAlpha(on ? 255 : 0);
         }
-        GradientDrawable bg = (GradientDrawable) t.getTag();
-        Integer was = (Integer) t.getTag(R.id.card_colour);
-        int from = was != null ? was : SURFACE, to = on ? FOCUSED : SURFACE;
-        t.setTag(R.id.card_colour, to);
-        if (from == to) return;
-        android.animation.ValueAnimator a = android.animation.ValueAnimator.ofObject(
-                new android.animation.ArgbEvaluator(), from, to);
-        a.setDuration(ms);
-        a.addUpdateListener(v -> bg.setColor((int) v.getAnimatedValue()));
-        a.start();
     }
 
-    /** A washed-out pastel of a colour: mostly bone-white with a hint of the hue. */
-    static int pastel(int colour) {
-        if (colour == SURFACE) return 0xFFE9E7E2;
-        float[] hsv = new float[3];
-        Color.colorToHSV(colour, hsv);
-        hsv[1] = Math.min(0.28f, hsv[1] * 0.45f);
-        hsv[2] = 0.95f;
-        return Color.HSVToColor(hsv);
-    }
-
-    /**
-     * The card colour for an icon: its main colour (the colourful pixels count most, so a white tile behind the logo
-     * does not win), deepened so the icon stands out on it. A colourless icon gets the plain surface.
-     */
-    static int tint(android.graphics.drawable.Drawable icon) {
-        if (icon == null) return SURFACE;
-        android.graphics.Bitmap b = android.graphics.Bitmap.createBitmap(24, 24, android.graphics.Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas canvas = new android.graphics.Canvas(b);
-        android.graphics.Rect old = icon.copyBounds();
-        icon.setBounds(0, 0, 24, 24);
-        icon.draw(canvas);
-        icon.setBounds(old);
-        float r = 0, g = 0, bl = 0, w = 0;
-        float[] hsv = new float[3];
-        for (int y = 0; y < 24; y++) {
-            for (int x = 0; x < 24; x++) {
-                int p = b.getPixel(x, y);
-                if (Color.alpha(p) < 128) continue;
-                Color.colorToHSV(p, hsv);
-                float k = hsv[1] * hsv[2] * hsv[1];
-                r += Color.red(p) * k;
-                g += Color.green(p) * k;
-                bl += Color.blue(p) * k;
-                w += k;
-            }
+    /** Icons ripple in one after another, the way a phone's home screen arrives. */
+    static void ripple(java.util.List<? extends View> cells, float restAlpha) {
+        for (int i = 0; i < cells.size(); i++) {
+            View v = cells.get(i);
+            v.setScaleX(0.82f);
+            v.setScaleY(0.82f);
+            v.setAlpha(0f);
+            v.animate().scaleX(1f).scaleY(1f).alpha(restAlpha).setStartDelay(Math.min(i, 18) * 28L).setDuration(520)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.3f))
+                    .withEndAction(() -> v.animate().setStartDelay(0)).start();
         }
-        b.recycle();
-        if (w < 3f) return SURFACE;
-        Color.colorToHSV(Color.rgb((int) (r / w), (int) (g / w), (int) (bl / w)), hsv);
-        hsv[1] = Math.min(0.7f, hsv[1]);
-        hsv[2] = 0.32f;   // deep: the icon is the bright thing on the card
-        return Color.HSVToColor(hsv);
     }
 
     /** The white ring a card wears while focused (hidden until then). */

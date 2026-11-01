@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- A card's current surface colour, so focus animates only on a change. -->
-    <item name="card_colour" type="id" />
+    <!-- Whether a tile is focused now, so focus animates only the tiles that change. -->
+    <item name="focused" type="id" />
+    <!-- The dark plate behind an app icon, shown on focus. -->
+    <item name="plate" type="id" />
 </resources>

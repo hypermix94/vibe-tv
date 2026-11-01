@@ -47,7 +47,8 @@ public class LibraryActivity extends Activity {
         s = getResources().getDisplayMetrics().widthPixels / 1920f;
         apps.addAll(Apps.all(this).values());   // already sorted by name
         setContentView(build());
-        paint(false);
+        Cards.ripple(cards, 0.9f);
+        root.post(() -> paint(true));
         new Thread(() -> {
             DailyWallpaper.Picture p = DailyWallpaper.today(this);
             runOnUiThread(() -> {
@@ -260,7 +261,10 @@ public class LibraryActivity extends Activity {
         for (int i = 0; i < cards.size(); i++) {
             boolean on = i == focus;
             FrameLayout c = cards.get(i);
-            c.animate().translationY(on ? -d(10) : 0).scaleX(on ? 1.1f : 1f).scaleY(on ? 1.1f : 1f)
+            Object was = c.getTag(R.id.focused);
+            if (animate && was != null && (Boolean) was == on) continue;   // unchanged: leave its ripple alone
+            c.setTag(R.id.focused, on);
+            c.animate().translationY(on ? -d(10) : 0).scaleX(on ? 1.14f : 1f).scaleY(on ? 1.14f : 1f)
                     .alpha(on ? 1f : 0.9f).setDuration(ms).setInterpolator(SPRING).start();
             c.setTranslationZ(on ? 1 : 0);
             Cards.focus(c, on, ms);

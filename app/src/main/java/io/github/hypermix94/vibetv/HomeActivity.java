@@ -428,6 +428,7 @@ public class HomeActivity extends Activity {
                 zone = Zone.TOP;
             } else {
                 zone = Zone.APPS;
+                Cards.ripple(appTiles, 0.9f);   // the icons arrive one after another
             }
         } else if (zone == Zone.TOP) {
             if (dx != 0) actionFocus = Math.max(0, Math.min(actions.size() - 1, actionFocus + dx));
@@ -654,6 +655,9 @@ public class HomeActivity extends Activity {
     }
 
     private void lift(View t, boolean on, float restAlpha, long ms) {
+        Object was = t.getTag(R.id.focused);
+        if (ms > 0 && was != null && (Boolean) was == on) return;   // unchanged: leave its motion (a ripple) alone
+        t.setTag(R.id.focused, on);
         if (on && ms > 0) t.announceForAccessibility(t.getContentDescription());   // TalkBack says the app's name
         t.animate().translationY(on ? -d(14) : 0).scaleX(on ? 1.12f : 1f).scaleY(on ? 1.12f : 1f)
                 .alpha(on ? 1f : restAlpha).setDuration(ms).setInterpolator(SPRING).start();
