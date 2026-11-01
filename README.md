@@ -82,9 +82,10 @@ If you ever want your TV's own home screen back, choose it as Home in Settings, 
 ## Privacy
 
 - **No account, no tracking, no ads.**
-- **The internet is used for four things,** none of which needs a key:
+- **The internet is used for these things only,** none of which needs a key:
   - lyrics, from [LRCLIB](https://lrclib.net);
   - the weather, from [Open-Meteo](https://open-meteo.com);
+  - your city, from [ipwho.is](https://ipwho.is), only if you set the weather city to Automatic;
   - the photographs, from [Wikimedia Commons](https://commons.wikimedia.org);
   - the animated greeting characters, from Google's Noto emoji.
 - **The music screen only hears what the TV is playing,** through Android's Visualizer. The microphone is used only

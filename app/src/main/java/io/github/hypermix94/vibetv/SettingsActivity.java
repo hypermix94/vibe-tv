@@ -192,7 +192,7 @@ public class SettingsActivity extends Activity {
     /** Typed words: OK brings up the keyboard, Done or Back saves. */
     private class TextRow extends Row {
         final String key, hint;
-        String value;
+        String value;   // the saved words
         EditText field;
 
         TextRow(String label, String key, String value, String hint) {
@@ -241,34 +241,139 @@ public class SettingsActivity extends Activity {
         }
     }
 
-    /** The weather city: typed, then looked up for its coordinates (Open-Meteo, no key). */
+    /** Cities to pick from without typing: name, latitude, longitude. */
+    private static final String[][] CITIES = {
+            {"Bengaluru", "12.9716", "77.5946"}, {"Chennai", "13.0827", "80.2707"}, {"Mumbai", "19.0760", "72.8777"},
+            {"Delhi", "28.6139", "77.2090"}, {"Hyderabad", "17.3850", "78.4867"}, {"Kolkata", "22.5726", "88.3639"},
+            {"Pune", "18.5204", "73.8567"}, {"Kochi", "9.9312", "76.2673"}, {"Coimbatore", "11.0168", "76.9558"},
+            {"Dubai", "25.2048", "55.2708"}, {"Singapore", "1.3521", "103.8198"}, {"London", "51.5072", "-0.1276"},
+            {"New York", "40.7128", "-74.0060"}, {"Toronto", "43.6532", "-79.3832"}, {"Los Angeles", "34.0522", "-118.2437"},
+            {"Sydney", "-33.8688", "151.2093"}, {"Tokyo", "35.6762", "139.6503"}, {"Paris", "48.8566", "2.3522"},
+            {"Berlin", "52.5200", "13.4050"},
+    };
+
+    /**
+     * The weather city, picked with Left and Right: Automatic (worked out from the internet connection), a list of
+     * cities, or "Type a city" for anywhere else (OK brings up the keyboard; the name is looked up on Open-Meteo).
+     */
     private class CityRow extends TextRow {
+        /** -1 Automatic, 0.. a listed city, CITIES.length "Type a city". */
+        int pick;
+
         CityRow() {
             super("Weather city", "set_place", Prefs.weatherPlace(SettingsActivity.this), "No weather");
+            boolean auto = Apps.prefs(SettingsActivity.this).getBoolean("set_place_auto", false);
+            pick = CITIES.length;
+            if (auto) pick = -1;
+            for (int i = 0; i < CITIES.length; i++) if (CITIES[i][0].equalsIgnoreCase(value)) pick = i;
+        }
+
+        @Override
+        View value() {
+            View v = super.value();
+            field.setText(words());
+            return v;
+        }
+
+        private String words() {
+            String name = pick == -1 ? "Automatic \u00b7 " + Prefs.weatherPlace(SettingsActivity.this)
+                    : pick < CITIES.length ? CITIES[pick][0] : (value.isEmpty() ? "Type a city\u2026" : value);
+            return "\u2039  " + name + "  \u203a";
+        }
+
+        @Override
+        void left() {
+            step(-1);
+        }
+
+        @Override
+        void right() {
+            step(1);
+        }
+
+        private void step(int by) {
+            int next = Math.max(-1, Math.min(CITIES.length, pick + by));
+            if (next == pick) return;
+            pick = next;
+            if (pick == -1) {
+                field.setText("\u2039  Finding where you are\u2026  \u203a");
+                new Thread(() -> {
+                    String[] here = whereAmI();
+                    runOnUiThread(() -> {
+                        if (here == null) {
+                            toast("Could not tell where this TV is");
+                        } else {
+                            store(here, true);
+                        }
+                        field.setText(words());
+                    });
+                }, "locate").start();
+                return;
+            }
+            if (pick < CITIES.length) store(CITIES[pick], false);
+            field.setText(words());
+            field.setTranslationX(d(by * 10));
+            field.animate().translationX(0).setDuration(250).setInterpolator(EASE_OUT).start();
+        }
+
+        private void store(String[] place, boolean auto) {
+            Prefs.edit(SettingsActivity.this).putString("set_place", place[0]).putString("set_lat", place[1])
+                    .putString("set_lon", place[2]).putBoolean("set_place_auto", auto).apply();
+            getSharedPreferences("header_weather", MODE_PRIVATE).edit().clear().apply();   // fetch afresh
+            value = place[0];
+        }
+
+        /** OK: only "Type a city" types; on any other choice OK does nothing. */
+        @Override
+        void ok() {
+            if (pick != CITIES.length) return;
+            field.setText(value);
+            super.ok();
         }
 
         @Override
         void save(String words) {
             String city = words.trim();
             if (city.isEmpty()) {
-                Prefs.edit(SettingsActivity.this).putString("set_place", "").putString("set_lat", "").putString("set_lon", "").apply();
+                Prefs.edit(SettingsActivity.this).putString("set_place", "").putString("set_lat", "").putString("set_lon", "")
+                        .putBoolean("set_place_auto", false).apply();
+                value = "";
+                field.setText(words());
                 return;
             }
-            field.setText("Looking up…");
+            field.setText("Looking up\u2026");
             new Thread(() -> {
                 String[] found = geocode(city);
                 runOnUiThread(() -> {
-                    if (found == null) {
-                        field.setText(Prefs.weatherPlace(SettingsActivity.this));
-                        toast("Could not find " + city);
-                        return;
-                    }
-                    Prefs.edit(SettingsActivity.this).putString("set_place", found[0])
-                            .putString("set_lat", found[1]).putString("set_lon", found[2]).apply();
-                    getSharedPreferences("header_weather", MODE_PRIVATE).edit().clear().apply();   // fetch afresh
-                    field.setText(found[0]);
+                    if (found == null) toast("Could not find " + city);
+                    else store(found, false);
+                    field.setText(words());
                 });
             }, "geocode").start();
+        }
+    }
+
+    /** The TV's city from its internet connection (ipwho.is, no key), as {place, latitude, longitude}; or null. */
+    private static String[] whereAmI() {
+        HttpURLConnection http = null;
+        try {
+            http = (HttpURLConnection) new URL("https://ipwho.is/?fields=success,city,latitude,longitude").openConnection();
+            http.setConnectTimeout(8000);
+            http.setReadTimeout(10000);
+            if (http.getResponseCode() != 200) return null;
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try (InputStream in = http.getInputStream()) {
+                byte[] b = new byte[4096];
+                int n;
+                while ((n = in.read(b)) > 0) out.write(b, 0, n);
+            }
+            JSONObject r = new JSONObject(out.toString("UTF-8"));
+            if (!r.optBoolean("success") || r.optString("city").isEmpty()) return null;
+            return new String[]{r.optString("city"), String.valueOf(r.optDouble("latitude")), String.valueOf(r.optDouble("longitude"))};
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (http != null) http.disconnect();
         }
     }
 
