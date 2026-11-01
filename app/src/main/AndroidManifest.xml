@@ -66,12 +66,14 @@
             android:exported="true"
             android:label="Home settings"
             android:icon="@drawable/ic_settings_app"
+            android:banner="@drawable/ic_settings_app"
             android:excludeFromRecents="true"
             android:screenOrientation="landscape"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
 

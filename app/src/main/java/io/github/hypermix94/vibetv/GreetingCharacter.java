@@ -62,7 +62,8 @@ final class GreetingCharacter {
         File dir = new File(context.getFilesDir(), "emoji");
         File file = new File(dir, code + ".webp");
         File none = new File(dir, code + ".none");   // no animation exists for this emoji: do not ask again
-        if (code.isEmpty() || none.isFile()) {
+        // Animated pictures need Android 9; on Android 8 the greeting shows without its character.
+        if (code.isEmpty() || none.isFile() || android.os.Build.VERSION.SDK_INT < 28) {
             show.accept(null);
             return;
         }

@@ -145,4 +145,10 @@ final class Cards {
             }
         };
     }
+
+    /** The font at a set weight (Android 9 and later); on Android 8, the font as it is. */
+    static android.graphics.Typeface weight(android.content.Context c, int font, int weight) {
+        android.graphics.Typeface face = c.getResources().getFont(font);
+        return android.os.Build.VERSION.SDK_INT >= 28 ? android.graphics.Typeface.create(face, weight, false) : face;
+    }
 }

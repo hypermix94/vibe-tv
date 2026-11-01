@@ -6,7 +6,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
@@ -765,7 +764,7 @@ public class HomeActivity extends Activity {
         card.setPadding(d(24), 0, 0, 0);
         card.setTranslationX(-d(24));
         heroTitle = text(168, R.font.outfit_medium, Color.WHITE);
-        heroTitle.setTypeface(Typeface.create(getResources().getFont(R.font.outfit_medium), 560, false));
+        heroTitle.setTypeface(Cards.weight(this, R.font.outfit_medium, 560));
         Cards.softCorners(heroTitle, s);
         heroTitle.setLetterSpacing(-0.045f);
         heroTitle.setText(a.label);

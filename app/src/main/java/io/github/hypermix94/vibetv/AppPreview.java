@@ -65,7 +65,7 @@ final class AppPreview extends FrameLayout {
         icon.setClipToOutline(true);
         content.addView(icon, new LinearLayout.LayoutParams(d(112), d(112)));
         name = Cards.text(c, s, 44, R.font.outfit_medium, Color.WHITE);
-        name.setTypeface(android.graphics.Typeface.create(c.getResources().getFont(R.font.outfit_medium), 600, false));
+        name.setTypeface(Cards.weight(c, R.font.outfit_medium, 600));
         name.setLetterSpacing(-0.02f);
         name.setMaxLines(2);
         name.setPadding(0, d(6), 0, d(6));
