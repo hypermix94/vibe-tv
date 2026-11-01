@@ -30,3 +30,6 @@ TV cmd notification allow_listener "$PKG/$PKG.NowPlayingListener"
 TV pm grant "$PKG" android.permission.RECORD_AUDIO
 TV pm grant "$PKG" android.permission.WRITE_SECURE_SETTINGS
 echo "vibe-tv installed and set as the screensaver."
+# Settings can change the screensaver delay; All apps can show each app's size.
+TV appops set "$PKG" WRITE_SETTINGS allow
+TV appops set "$PKG" GET_USAGE_STATS allow

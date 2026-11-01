@@ -31,7 +31,7 @@ import java.util.function.Consumer;
 final class SearchBar extends LinearLayout {
     private final float s;
     private final EditText field;
-    private final FrameLayout mic;
+    private final FrameLayout mic, assistant;
     private final Consumer<String> onQuery;
     private final Runnable onDone;
     private SpeechRecognizer recognizer;
@@ -62,6 +62,9 @@ final class SearchBar extends LinearLayout {
         field.setTextSize(TypedValue.COMPLEX_UNIT_PX, d(28));
         field.setTypeface(c.getResources().getFont(R.font.outfit_regular));
         field.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        field.setGravity(Gravity.CENTER_VERTICAL);   // the words sit in the middle of the bar
+        field.setPadding(0, 0, 0, 0);
+        field.setIncludeFontPadding(false);
         field.setFocusable(false);   // the remote drives the screen until OK is pressed on the field
         field.addTextChangedListener(new TextWatcher() {
             @Override
@@ -81,22 +84,32 @@ final class SearchBar extends LinearLayout {
             stopTyping();
             return true;
         });
-        LayoutParams fLp = new LayoutParams(0, -2, 1f);
+        LayoutParams fLp = new LayoutParams(0, -1, 1f);
         fLp.leftMargin = d(14);
         addView(field, fLp);
-        mic = new FrameLayout(c);
+        mic = round(c, R.drawable.ic_mic, "Search by voice");
+        addView(mic, new LayoutParams(d(54), d(54)));
+        assistant = round(c, R.drawable.ic_assistant, "Voice assistant");
+        LayoutParams aLp = new LayoutParams(d(54), d(54));
+        aLp.leftMargin = d(4);
+        addView(assistant, aLp);
+    }
+
+    /** A round button: a white disc (shown on focus) behind a white glyph. */
+    private FrameLayout round(Context c, int icon, String name) {
+        FrameLayout b = new FrameLayout(c);
         View disc = new View(c);
         GradientDrawable circle = new GradientDrawable();
         circle.setShape(GradientDrawable.OVAL);
         circle.setColor(Color.WHITE);
         disc.setBackground(circle);
         disc.setAlpha(0f);
-        mic.addView(disc, new FrameLayout.LayoutParams(-1, -1));
+        b.addView(disc, new FrameLayout.LayoutParams(-1, -1));
         ImageView glyph = new ImageView(c);
-        glyph.setImageResource(R.drawable.ic_mic);
-        mic.addView(glyph, new FrameLayout.LayoutParams(d(30), d(30), Gravity.CENTER));
-        mic.setContentDescription("Search by voice");
-        addView(mic, new LayoutParams(d(54), d(54)));
+        glyph.setImageResource(icon);
+        b.addView(glyph, new FrameLayout.LayoutParams(d(30), d(30), Gravity.CENTER));
+        b.setContentDescription(name);
+        return b;
     }
 
     boolean typing() {
@@ -111,7 +124,7 @@ final class SearchBar extends LinearLayout {
         field.setText("");
     }
 
-    /** Where the remote is: -1 elsewhere, 0 on the field, 1 on the mic. */
+    /** Where the remote is: -1 elsewhere, 0 on the field, 1 on the mic, 2 on the assistant. */
     void focus(int which) {
         focused = which;
         paint();
@@ -121,6 +134,7 @@ final class SearchBar extends LinearLayout {
     void press() {
         if (focused == 0) startTyping();
         else if (focused == 1) listen();
+        else if (focused == 2) openAssistant();
     }
 
     private void paint() {
@@ -130,6 +144,9 @@ final class SearchBar extends LinearLayout {
         bg.setColor(onField ? 0x40FFFFFF : 0x26FFFFFF);
         mic.getChildAt(0).animate().alpha(onMic ? 1f : 0f).setDuration(400).start();
         ((ImageView) mic.getChildAt(1)).setColorFilter(onMic ? Color.BLACK : Color.WHITE);
+        boolean onAssistant = focused == 2;
+        assistant.getChildAt(0).animate().alpha(onAssistant ? 1f : 0f).setDuration(400).start();
+        ((ImageView) assistant.getChildAt(1)).setColorFilter(onAssistant ? Color.BLACK : Color.WHITE);
         animate().scaleX(focused >= 0 ? 1.03f : 1f).scaleY(focused >= 0 ? 1.03f : 1f).setDuration(400).start();
     }
 
@@ -221,6 +238,20 @@ final class SearchBar extends LinearLayout {
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3));
+    }
+
+    /** Opens whatever voice assistant the TV has (Google Assistant, Alexa...), the way its own voice button would. */
+    private void openAssistant() {
+        String[] actions = {Intent.ACTION_VOICE_COMMAND, "android.intent.action.VOICE_ASSIST", Intent.ACTION_ASSIST,
+                "android.search.action.GLOBAL_SEARCH"};
+        for (String a : actions) {
+            Intent i = new Intent(a).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (i.resolveActivity(getContext().getPackageManager()) != null) {
+                getContext().startActivity(i);
+                return;
+            }
+        }
+        field.setHint("No voice assistant is on");
     }
 
     /** The remote's voice button: straight to listening. */

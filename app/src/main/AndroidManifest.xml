@@ -3,6 +3,10 @@
 
     <!-- Lyrics (LRCLIB), weather (Open-Meteo) and the screensaver's photographs (Wikimedia Commons). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Settings changes the screensaver delay; granted over adb. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"
+        xmlns:tools="http://schemas.android.com/tools"
+        tools:ignore="ProtectedPermissions" />
     <!-- All apps shows each app's size; granted over adb as usage access. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         xmlns:tools="http://schemas.android.com/tools"
@@ -35,6 +39,7 @@
 
     <application
         android:allowBackup="false"
+        android:icon="@drawable/ic_settings_app"
         android:label="@string/app_name"
         android:supportsRtl="true">
 
@@ -52,6 +57,21 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- vibe-tv's settings, listed among the apps. -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="Settings"
+            android:icon="@drawable/ic_settings_app"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 

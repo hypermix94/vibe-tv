@@ -50,7 +50,9 @@ final class Apps {
             Intent q = new Intent(Intent.ACTION_MAIN).addCategory(category);
             for (ResolveInfo r : pm.queryIntentActivities(q, 0)) {
                 ActivityInfo a = r.activityInfo;
-                if (a.packageName.equals(c.getPackageName()) || found.containsKey(a.packageName)) continue;
+                boolean mine = a.packageName.equals(c.getPackageName());
+                if ((mine && !a.name.endsWith(".SettingsActivity")) || found.containsKey(a.packageName)) continue;   // our Settings shows
+                if (!mine && !wanted(a.applicationInfo)) continue;   // factory utilities stay out of sight
                 Intent launch = new Intent(Intent.ACTION_MAIN).addCategory(category)
                         .setClassName(a.packageName, a.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 Drawable banner = a.loadBanner(pm);
@@ -63,6 +65,20 @@ final class Apps {
         Map<String, App> out = new LinkedHashMap<>();
         for (App a : sorted) out.put(a.pkg, a);
         return out;
+    }
+
+    /**
+     * The apps worth listing: ones you installed, ones kept up to date from the Play Store (Netflix, YouTube...), the
+     * TV's own Settings, and its TV app (live TV and the inputs). Factory utilities (notification centres, help,
+     * media players, updaters) are left out.
+     */
+    private static boolean wanted(android.content.pm.ApplicationInfo ai) {
+        boolean system = (ai.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0;
+        boolean updated = (ai.flags & android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
+        if (!system || updated) return true;
+        String p = ai.packageName;
+        return p.equals("com.android.tv.settings") || p.equals("com.android.vending")
+                || p.contains("tvcenter") || p.equals("com.google.android.tv") || p.contains("livetv");
     }
 
     static SharedPreferences prefs(Context c) {
@@ -79,7 +95,7 @@ final class Apps {
     }
 
     static void saveDock(Context c, List<String> pkgs) {
-        prefs(c).edit().putString("dock", String.join(",", pkgs.subList(0, Math.min(pkgs.size(), MAX_DOCK))))
+        prefs(c).edit().putString("dock", String.join(",", pkgs.subList(0, Math.min(pkgs.size(), Prefs.dockMax(c)))))
                 .putLong("rev", revision(c) + 1).apply();
     }
 
@@ -109,7 +125,7 @@ final class Apps {
     static boolean addToDock(Context c, String pkg) {
         List<String> d = dockOrder(c);
         if (d.contains(pkg)) return true;
-        if (d.size() >= MAX_DOCK) return false;
+        if (d.size() >= Prefs.dockMax(c)) return false;
         d.add(pkg);
         saveDock(c, d);
         setHidden(c, pkg, false);

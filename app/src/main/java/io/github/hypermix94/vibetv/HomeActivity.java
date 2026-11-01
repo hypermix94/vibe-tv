@@ -41,7 +41,9 @@ import java.util.Map;
  * The remote is handled here directly (Left, Right, Up, Down, OK), so focus goes exactly where the design says.
  */
 public class HomeActivity extends Activity {
-    private static final int DOCK = 6, COLUMNS = 10;
+    private static final int DOCK = 6;
+    /** Icons per row in Apps, from Settings. */
+    private int COLUMNS = 10;
     private static final Interpolator EASE_OUT = new PathInterpolator(0.22f, 1f, 0.36f, 1f);
     private static final Interpolator SPRING = new OvershootInterpolator(1.4f);
 
@@ -89,6 +91,7 @@ public class HomeActivity extends Activity {
         super.onCreate(state);
         s = getResources().getDisplayMetrics().widthPixels / 1920f;
         builtRevision = Apps.revision(this);
+        COLUMNS = Prefs.columns(this);
         loadApps();
         setContentView(build());
         paintFocus(false);
@@ -149,7 +152,7 @@ public class HomeActivity extends Activity {
         boolean unset = Apps.dockOrder(this).isEmpty();
         for (String pkg : Apps.dockOrder(this)) {
             App a = all.remove(pkg);
-            if (a != null && dock.size() < Apps.MAX_DOCK) dock.add(a);
+            if (a != null && dock.size() < Prefs.dockMax(this)) dock.add(a);
         }
         for (App a : all.values()) if (!hidden.contains(a.pkg)) others.add(a);
         while (unset && dock.size() < DOCK && !others.isEmpty()) dock.add(others.remove(0));   // a first-run dock
@@ -229,6 +232,7 @@ public class HomeActivity extends Activity {
         secLp.leftMargin = d(10);
         secLp.topMargin = d(24);   // the seconds' top meets the top of the digits
         clock.addView(sec, secLp);
+        if (!Prefs.seconds(this)) seconds.setVisibility(View.GONE);   // Settings: no seconds
         LinearLayout.LayoutParams clockLp = new LinearLayout.LayoutParams(-2, -2);
         clockLp.topMargin = d(6);
         top.addView(clock, clockLp);
@@ -884,11 +888,12 @@ public class HomeActivity extends Activity {
                 {"Late show", "🍿"}, {"Good morning", "☀️"}, {"Good afternoon", "😎"},
                 {"Good evening", "🌆"}, {"Late show", "🍿"}};
         String[] pick = h < 5 ? byHour[0] : h < 12 ? byHour[1] : h < 17 ? byHour[2] : h < 22 ? byHour[3] : byHour[4];
-        String name = getString(R.string.owner_name).trim();
+        String name = Prefs.name(this);
         String line = name.isEmpty() ? pick[0] + "." : pick[0] + ", " + name + ".";
         if (line.contentEquals(greeting.getText())) return;
         greeting.setText(line);
-        new GreetingCharacter(this).load(pick[1], d(40), drawable -> {
+        character.setVisibility(Prefs.greetingCharacter(this) ? View.VISIBLE : View.GONE);
+        if (Prefs.greetingCharacter(this)) new GreetingCharacter(this).load(pick[1], d(40), drawable -> {
             if (drawable != null) character.setImageDrawable(drawable);
         });
     }

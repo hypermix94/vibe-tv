@@ -153,7 +153,7 @@ final class AppPreview extends FrameLayout {
 
     private String lastOpened(String pkg) {
         long at = Apps.prefs(context).getLong("opened_" + pkg, 0);
-        if (at == 0) return "Not opened from vibe-tv yet";
+        if (at == 0) return "Not yet opened";
         return DateFormat.format("d MMMM, " + (DateFormat.is24HourFormat(context) ? "HH:mm" : "h:mm a"), at).toString();
     }
 

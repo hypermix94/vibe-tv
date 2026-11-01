@@ -26,7 +26,9 @@ import java.util.List;
  * Back returns to the home screen, which picks up the changes.
  */
 public class LibraryActivity extends Activity {
-    private static final int COLUMNS = 7;   // the preview panel takes the right side
+    /** Icons per row: 7 beside the preview panel, 10 without it. */
+    private int COLUMNS = 7;
+    private boolean withPreview;
     private static final Interpolator EASE_OUT = new PathInterpolator(0.22f, 1f, 0.36f, 1f);
     private static final Interpolator SPRING = new OvershootInterpolator(1.4f);
 
@@ -52,6 +54,8 @@ public class LibraryActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         s = getResources().getDisplayMetrics().widthPixels / 1920f;
+        withPreview = Prefs.previewPanel(this);
+        COLUMNS = withPreview ? 7 : 10;
         all.addAll(Apps.all(this).values());   // already sorted by name
         apps.addAll(all);
         setContentView(build());
@@ -109,16 +113,17 @@ public class LibraryActivity extends Activity {
         column.addView(grid, gridLp);
 
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
-        lp.setMargins(d(112), d(96), d(112 + 520 + 48), 0);
+        lp.setMargins(d(112), d(96), d(withPreview ? 112 + 520 + 48 : 112), 0);
         root.addView(column, lp);
         // On the right: the focused app at a glance.
         preview = new AppPreview(this, s);
         FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(d(520), -1, Gravity.END);
         pLp.setMargins(0, d(96), d(112), d(96));
         root.addView(preview, pLp);
+        if (!withPreview) preview.setVisibility(View.GONE);   // Settings: no preview panel
         scroll = new ScrollBar(this, s);   // on the right: where in the apps the remote is
         FrameLayout.LayoutParams barLp = new FrameLayout.LayoutParams(d(20), -1, Gravity.END);
-        barLp.setMargins(0, d(200), d(112 + 520 + 14), d(96));
+        barLp.setMargins(0, d(200), d(withPreview ? 112 + 520 + 14 : 48), d(96));
         root.addView(scroll, barLp);
         column.setAlpha(0f);
         column.setTranslationY(d(28));
@@ -204,8 +209,8 @@ public class LibraryActivity extends Activity {
                 return true;
             }
             if (e.getAction() != KeyEvent.ACTION_DOWN) return true;
-            if (k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                searchFocus = k == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : 0;
+            if (k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT) {   // field, mic, assistant
+                searchFocus = Math.max(0, Math.min(2, searchFocus + (k == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1)));
                 search.focus(searchFocus);
             } else if (k == KeyEvent.KEYCODE_DPAD_DOWN && !apps.isEmpty()) {
                 onSearch = false;
@@ -383,7 +388,7 @@ public class LibraryActivity extends Activity {
             App a = apps.get(focus);
             String where = Apps.dockOrder(this).contains(a.pkg) ? "In the dock"
                     : Apps.hidden(this).contains(a.pkg) ? "Not on Home" : "On Home";
-            preview.show(a, where, animate);
+            if (withPreview) preview.show(a, where, animate);
         }
         int row = focus / COLUMNS;
         int rows = (apps.size() + COLUMNS - 1) / COLUMNS;

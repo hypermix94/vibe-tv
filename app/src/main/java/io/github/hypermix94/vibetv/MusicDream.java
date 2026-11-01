@@ -50,8 +50,7 @@ public class MusicDream extends DreamService {
         setInteractive(false);   // any key ends the screensaver
         setContentView(buildScreen());
         scenery = new Scenery(this);
-        weather = new HeaderWeather(this, getString(R.string.weather_latitude).trim(),
-                getString(R.string.weather_longitude).trim());
+        weather = new HeaderWeather(this, Prefs.weatherLatitude(this), Prefs.weatherLongitude(this));
     }
 
     /**
@@ -183,7 +182,7 @@ public class MusicDream extends DreamService {
     private void showWeather(HeaderWeather.Reading r) {
         if (r == null || temp == null) return;
         temp.setText(r.temp + "°");
-        String place = getString(R.string.weather_place).trim();
+        String place = Prefs.weatherPlace(this);
         sky.setText(place.isEmpty() ? r.words() : r.words() + " · " + place);
         skyIcon.setImageResource(r.iconRes());
         ((View) temp.getParent().getParent()).setVisibility(View.VISIBLE);
