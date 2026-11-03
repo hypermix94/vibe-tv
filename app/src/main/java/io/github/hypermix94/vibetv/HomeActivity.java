@@ -206,7 +206,11 @@ public class HomeActivity extends Activity {
     }
 
     private void openSetting(int which) {
-        String[] actions = {"com.android.tv.action.VIEW_INPUTS", "android.settings.WIFI_SETTINGS", "android.settings.SETTINGS"};
+        if (which == 2) {
+            newWallpaper();
+            return;
+        }
+        String[] actions = {"com.android.tv.action.VIEW_INPUTS", "android.settings.WIFI_SETTINGS", "", "android.settings.SETTINGS"};
         try {
             startActivity(new Intent(actions[which]).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } catch (RuntimeException e) {
@@ -288,9 +292,9 @@ public class HomeActivity extends Activity {
         page.addView(top, at(d(1000), -2, Gravity.TOP | Gravity.START, 112, 64, 0, 0));
         top.setTag("rise:80");
 
-        // Top right: Inputs, Wi-Fi, Settings.
+        // Top right: Inputs, Wi-Fi, New wallpaper, Settings.
         LinearLayout acts = new LinearLayout(this);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < ACTION_NAMES.length; i++) {
             FrameLayout b = new FrameLayout(this);
             View disc = new View(this);
             GradientDrawable circle = new GradientDrawable();
@@ -301,9 +305,9 @@ public class HomeActivity extends Activity {
             b.addView(disc, match());
             // Drawn icons, so each motion ends in a solid colour: Inputs, a live Wi-Fi signal meter, Settings.
             View icon = i == 1 ? (wifiIcon = new WifiIcon(this))
-                    : new ActionIcon(this, i == 0 ? ActionIcon.INPUTS : ActionIcon.SETTINGS);
+                    : new ActionIcon(this, i == 0 ? ActionIcon.INPUTS : i == 2 ? ActionIcon.REFRESH : ActionIcon.SETTINGS);
             b.addView(icon, new FrameLayout.LayoutParams(d(40), d(40), Gravity.CENTER));
-            b.setContentDescription(new String[]{"Inputs", "Wi-Fi", "Settings"}[i]);
+            b.setContentDescription(ACTION_NAMES[i]);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(d(72), d(72));
             if (i > 0) lp.leftMargin = d(18);
             acts.addView(b, lp);
@@ -311,6 +315,17 @@ public class HomeActivity extends Activity {
             actions.add(b);
         }
         page.addView(acts, at(-2, -2, Gravity.TOP | Gravity.END, 0, 0, 112, 0));
+        actsRow = acts;
+        // The focused button's name, in a small pill under it.
+        actionTip = Cards.text(this, s, 22, R.font.outfit_medium, Color.WHITE);
+        GradientDrawable pill = new GradientDrawable();
+        pill.setColor(Cards.SURFACE);
+        pill.setCornerRadius(d(20));
+        actionTip.setBackground(pill);
+        actionTip.setPadding(d(18), d(8), d(18), d(8));
+        actionTip.setSingleLine(true);
+        actionTip.setAlpha(0f);
+        page.addView(actionTip, at(-2, -2, Gravity.TOP | Gravity.START, 0, 0, 0, 0));
         // The buttons sit level with the middle of the clock's digits, measured once laid out.
         acts.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
@@ -707,8 +722,62 @@ public class HomeActivity extends Activity {
         wallpaper.animate().alpha(inApps ? 0.45f : 1f).setDuration(animate ? 700 : 0).start();
     }
 
+    private static final String[] ACTION_NAMES = {"Inputs", "Wi-Fi", "New wallpaper", "Settings"};
+    private LinearLayout actsRow;
+    private TextView actionTip;
+    private boolean fetchingWallpaper;
+
+    /** The name of the focused top-right button, centred under it; it fades and rises in, and fades out on leaving. */
+    private void showActionTip(int lit) {
+        if (lit < 0) {
+            actionTip.animate().alpha(0f).translationY(actionTip.getTranslationY() - d(6)).setDuration(200).start();
+            return;
+        }
+        actionTip.setText(ACTION_NAMES[lit]);
+        actionTip.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        View b = actions.get(lit);
+        float x = actsRow.getLeft() + b.getLeft() + b.getWidth() / 2f - actionTip.getMeasuredWidth() / 2f;
+        x = Math.min(x, page.getWidth() - d(40) - actionTip.getMeasuredWidth());   // never off the right edge
+        float y = actsRow.getTop() + b.getBottom() + d(14);
+        boolean wasShown = actionTip.getAlpha() > 0.5f;
+        actionTip.animate().cancel();
+        if (wasShown) {
+            actionTip.animate().translationX(x).translationY(y).setDuration(300).setInterpolator(EASE_OUT).start();
+        } else {
+            actionTip.setTranslationX(x);
+            actionTip.setTranslationY(y + d(8));
+            actionTip.animate().alpha(1f).translationY(y).setDuration(300).setInterpolator(EASE_OUT).start();
+        }
+    }
+
+    /** New wallpaper: a different picture from another day, kept until tomorrow; the arrow turns while it loads. */
+    private void newWallpaper() {
+        if (fetchingWallpaper) return;
+        fetchingWallpaper = true;
+        ActionIcon icon = (ActionIcon) actions.get(2).getChildAt(1);
+        icon.spin(true);
+        new Thread(() -> {
+            DailyWallpaper.Picture p = DailyWallpaper.another(this);
+            main.post(() -> {
+                fetchingWallpaper = false;
+                icon.spin(false);
+                if (isDestroyed()) return;
+                if (p == null) {
+                    android.widget.Toast.makeText(this, "Couldn't get a new picture. Check the internet.", android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                wallpaper.animate().alpha(0f).setDuration(400).withEndAction(() -> {
+                    wallpaper.setImageBitmap(p.bitmap);
+                    credit.setText(p.credit);
+                    wallpaper.animate().alpha(1f).setDuration(900).setInterpolator(EASE_OUT).start();
+                }).start();
+            });
+        }, "new-wallpaper").start();
+    }
+
     /** Lights the focused top-right button (white disc, dark icon, its own motion) and settles the others. */
     private void paintActions(int lit, long slow) {
+        showActionTip(lit);
         for (int i = 0; i < actions.size(); i++) {
             FrameLayout b = actions.get(i);
             boolean on = i == lit, was = i == litAction;

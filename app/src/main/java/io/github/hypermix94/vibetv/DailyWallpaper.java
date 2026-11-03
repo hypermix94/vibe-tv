@@ -61,9 +61,35 @@ final class DailyWallpaper {
         return b != null ? new Picture(b, read(txt)) : null;
     }
 
-    /** Walks back from today to the most recent wide Picture of the Day and saves it at 1920 px. */
+    /**
+     * A different picture, asked for with the New wallpaper button: a wide Picture of the Day from a random day in the
+     * last few years, kept as today's so it stays until tomorrow. Null when none could be had (offline).
+     */
+    static Picture another(Context context) {
+        File dir = new File(context.getFilesDir(), "wallpaper");
+        String day = new SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(Calendar.getInstance().getTime());
+        File jpg = new File(dir, day + ".jpg"), txt = new File(dir, day + ".txt");
+        if (!dir.isDirectory() && !dir.mkdirs()) return null;
+        File newJpg = new File(dir, "next.jpg"), newTxt = new File(dir, "next.txt");
+        for (int tries = 0; tries < 3 && !newJpg.isFile(); tries++) {
+            Calendar from = Calendar.getInstance();
+            from.add(Calendar.DAY_OF_MONTH, -1 - new java.util.Random().nextInt(5 * 365));
+            fetch(newJpg, newTxt, from);
+        }
+        if (!newJpg.isFile() || !newJpg.renameTo(jpg)) return null;
+        if (!newTxt.renameTo(txt)) txt.delete();
+        BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inPreferredConfig = Bitmap.Config.RGB_565;
+        Bitmap b = BitmapFactory.decodeFile(jpg.getPath(), o);
+        return b != null ? new Picture(b, read(txt)) : null;
+    }
+
     private static void fetch(File jpg, File txt) {
-        Calendar day = Calendar.getInstance();
+        fetch(jpg, txt, Calendar.getInstance());
+    }
+
+    /** Walks back from a day to the most recent wide Picture of the Day and saves it at 1920 px. */
+    private static void fetch(File jpg, File txt, Calendar day) {
         SimpleDateFormat path = new SimpleDateFormat("yyyy/MM/dd", Locale.ROOT);
         for (int back = 0; back < 21; back++) {
             try {
@@ -96,7 +122,7 @@ final class DailyWallpaper {
     }
 
     private static void prune(File dir) {
-        File[] all = dir.listFiles((d, n) -> n.endsWith(".jpg"));
+        File[] all = dir.listFiles((d, n) -> n.endsWith(".jpg") && !n.startsWith("next"));
         if (all == null || all.length <= KEEP) return;
         Arrays.sort(all);
         for (int i = 0; i < all.length - KEEP; i++) {
