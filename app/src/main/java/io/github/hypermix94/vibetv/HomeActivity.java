@@ -253,8 +253,8 @@ public class HomeActivity extends Activity {
         greeting.setSingleLine(true);
         character = new GreetingIcon(this);
         character.setAlpha(0.9f);
-        LinearLayout.LayoutParams charLp = new LinearLayout.LayoutParams(d(50), d(50));
-        charLp.leftMargin = d(14);
+        LinearLayout.LayoutParams charLp = new LinearLayout.LayoutParams(d(36), d(36));
+        charLp.leftMargin = d(10);
         greetRow.addView(character, charLp);
         top.addView(greetRow);
         LinearLayout clock = new LinearLayout(this);
