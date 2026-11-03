@@ -107,7 +107,7 @@ public class SettingsActivity extends Activity {
             }
         });
         rows.add(new SwitchRow("Seconds on the clock", "set_seconds", Prefs.seconds(this)));
-        rows.add(new SwitchRow("Animated greeting character", "set_character", Prefs.greetingCharacter(this)));
+        rows.add(new SwitchRow("Greeting icon", "set_character", Prefs.greetingCharacter(this)));
         rows.add(new SwitchRow("Preview panel in All apps", "set_preview", Prefs.previewPanel(this)));
         setContentView(build());
         paint(false);

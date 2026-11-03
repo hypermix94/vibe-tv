@@ -51,7 +51,7 @@ public class HomeActivity extends Activity {
     private FrameLayout root, page, heroBox;
     private ImageView wallpaper;
     private TextView greeting, hm, seconds, ampm, date, credit;
-    private ImageView character;
+    private GreetingIcon character;
     private final List<FrameLayout> dockTiles = new ArrayList<>(), appTiles = new ArrayList<>();
     private final List<FrameLayout> actions = new ArrayList<>();
     private final List<App> dock = new ArrayList<>(), others = new ArrayList<>();
@@ -251,8 +251,9 @@ public class HomeActivity extends Activity {
         greeting = text(30, R.font.outfit_regular, 0xB8FFFFFF);
         greetRow.addView(greeting, new LinearLayout.LayoutParams(-2, -2));
         greeting.setSingleLine(true);
-        character = new ImageView(this);
-        LinearLayout.LayoutParams charLp = new LinearLayout.LayoutParams(d(40), d(40));
+        character = new GreetingIcon(this);
+        character.setAlpha(0.9f);
+        LinearLayout.LayoutParams charLp = new LinearLayout.LayoutParams(d(50), d(50));
         charLp.leftMargin = d(14);
         greetRow.addView(character, charLp);
         top.addView(greetRow);
@@ -990,21 +991,16 @@ public class HomeActivity extends Activity {
         }
     };
 
-    /** "Good morning", "Late show" and so on, with the owner's name and an animated character to match the hour. */
+    /** "Good morning", "Late show" and so on, with the owner's name and a drawn picture to match the hour. */
     private void greetingLine() {
         int h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        String[][] byHour = {
-                {"Late show", "🍿"}, {"Good morning", "☀️"}, {"Good afternoon", "😎"},
-                {"Good evening", "🌆"}, {"Late show", "🍿"}};
-        String[] pick = h < 5 ? byHour[0] : h < 12 ? byHour[1] : h < 17 ? byHour[2] : h < 22 ? byHour[3] : byHour[4];
+        String words = h < 5 || h >= 22 ? "Late show" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
         String name = Prefs.name(this);
-        String line = name.isEmpty() ? pick[0] + "." : pick[0] + ", " + name + ".";
+        String line = name.isEmpty() ? words + "." : words + ", " + name + ".";
         if (line.contentEquals(greeting.getText())) return;
         greeting.setText(line);
         character.setVisibility(Prefs.greetingCharacter(this) ? View.VISIBLE : View.GONE);
-        if (Prefs.greetingCharacter(this)) new GreetingCharacter(this).load(pick[1], d(40), drawable -> {
-            if (drawable != null) character.setImageDrawable(drawable);
-        });
+        if (Prefs.greetingCharacter(this)) character.show(GreetingIcon.forWords(words));
     }
 
     // ---- small helpers ------------------------------------------------------------------------------
