@@ -51,7 +51,10 @@ public class HomeActivity extends Activity {
     private FrameLayout root, page, heroBox;
     private ImageView wallpaper;
     private TextView greeting, hm, seconds, ampm, date, credit;
-    private GreetingIcon character;
+    /** The greeting's emoji: the plain one at once, replaced by its animation when that has loaded. */
+    private FrameLayout character;
+    private TextView characterText;
+    private ImageView characterAnim;
     private final List<FrameLayout> dockTiles = new ArrayList<>(), appTiles = new ArrayList<>();
     private final List<FrameLayout> actions = new ArrayList<>();
     private final List<App> dock = new ArrayList<>(), others = new ArrayList<>();
@@ -161,6 +164,11 @@ public class HomeActivity extends Activity {
                 return;
             }
         }
+        if (resumedBefore) {   // back from an app: a different greeting
+            greetPick += 1 + new java.util.Random().nextInt(4);
+            greetingLine();
+        }
+        resumedBefore = true;
         main.post(tick);
         loadWallpaper();   // a new day's picture
         showHero(true);   // "last opened" may have changed
@@ -251,9 +259,13 @@ public class HomeActivity extends Activity {
         greeting = text(30, R.font.outfit_regular, 0xB8FFFFFF);
         greetRow.addView(greeting, new LinearLayout.LayoutParams(-2, -2));
         greeting.setSingleLine(true);
-        character = new GreetingIcon(this);
-        character.setAlpha(0.9f);
-        LinearLayout.LayoutParams charLp = new LinearLayout.LayoutParams(d(36), d(36));
+        character = new FrameLayout(this);
+        characterText = text(30, R.font.outfit_regular, Color.WHITE);
+        characterText.setGravity(Gravity.CENTER);
+        character.addView(characterText, match());
+        characterAnim = new ImageView(this);
+        character.addView(characterAnim, match());
+        LinearLayout.LayoutParams charLp = new LinearLayout.LayoutParams(d(40), d(40));
         charLp.leftMargin = d(10);
         greetRow.addView(character, charLp);
         top.addView(greetRow);
@@ -991,16 +1003,42 @@ public class HomeActivity extends Activity {
         }
     };
 
-    /** "Good morning", "Late show" and so on, with the owner's name and a drawn picture to match the hour. */
+    /** Which of the greetings shows; a new one each time Home comes back from an app. */
+    private int greetPick = new java.util.Random().nextInt(5);
+    private boolean resumedBefore;
+
+    /**
+     * A funny greeting for the time of day with its animated emoji, swapped with a soft lift. It changes when you come
+     * back to Home, and when the part of the day changes while Home is open; not otherwise.
+     */
     private void greetingLine() {
         int h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        String words = h < 5 || h >= 22 ? "Late show" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-        String name = Prefs.name(this);
-        String line = name.isEmpty() ? words + "." : words + ", " + name + ".";
-        if (line.contentEquals(greeting.getText())) return;
-        greeting.setText(line);
-        character.setVisibility(Prefs.greetingCharacter(this) ? View.VISIBLE : View.GONE);
-        if (Prefs.greetingCharacter(this)) character.show(GreetingIcon.forWords(words));
+        String[] g = Greetings.pick(h, greetPick, Prefs.name(this));
+        if (g[0].contentEquals(greeting.getText())) return;
+        boolean emoji = Prefs.greetingCharacter(this);
+        character.setVisibility(emoji ? View.VISIBLE : View.GONE);
+        View row = (View) greeting.getParent();
+        Runnable swap = () -> {
+            greeting.setText(g[0]);
+            if (!emoji) return;
+            characterText.setText(g[1]);
+            characterText.setVisibility(View.VISIBLE);
+            characterAnim.setImageDrawable(null);
+            new GreetingCharacter(this).load(g[1], d(40), drawable -> {
+                if (drawable == null || !g[0].contentEquals(greeting.getText())) return;
+                characterAnim.setImageDrawable(drawable);
+                characterText.setVisibility(View.INVISIBLE);
+            });
+        };
+        if (greeting.getText().length() == 0) {
+            swap.run();
+            return;
+        }
+        row.animate().alpha(0f).translationY(-d(10)).setDuration(260).setInterpolator(EASE_OUT).withEndAction(() -> {
+            swap.run();
+            row.setTranslationY(d(10));
+            row.animate().alpha(1f).translationY(0).setDuration(420).setInterpolator(EASE_OUT).start();
+        }).start();
     }
 
     // ---- small helpers ------------------------------------------------------------------------------

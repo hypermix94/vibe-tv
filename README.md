@@ -26,7 +26,7 @@ No ads, no account, nothing to sign in to. Made by Hypermix. 🎶📺<br>
 ## 🏠 Home screen
 
 - 🖼️ **A new photograph every day:** Wikimedia Commons' Picture of the Day, the same one all day.
-- 👋 **A greeting with your name** and a small drawn sun or moon for the time of day, the clock with seconds and the date.
+- 👋 **A greeting with your name** that changes every minute (funny lines for the time of day, each with an animated emoji), the clock with seconds and the date.
 - ⏰ **Alarms and timers:** when one is set, the date slides over to show it ("Alarm · 7:30 am", or a timer counting
   down), and the clock becomes a shortcut to the alarm or timer app.
 - 📶 **Inputs, Wi-Fi, New wallpaper and the TV's Settings** at the top right, each named in a small pop-up when you land on it. The Wi-Fi icon shows your signal strength, like a phone's.
@@ -95,7 +95,7 @@ Open **Home settings** from the Apps row or All apps. It is named so it is not c
 | Dock holds up to | 4 to 10 apps |
 | Icons per row in Apps | 6 to 10 |
 | Seconds on the clock | On or off |
-| Greeting icon | On or off |
+| Greeting emoji | On or off |
 | Preview panel in All apps | On or off |
 
 ## 🛠️ Install
@@ -160,7 +160,7 @@ If you ever want your TV's own home screen back, choose it as Home in Settings, 
   - the weather, from [Open-Meteo](https://open-meteo.com);
   - your city, from [ipwho.is](https://ipwho.is), only if you set the weather city to Automatic;
   - the photographs, from [Wikimedia Commons](https://commons.wikimedia.org);
-  - the spinning disco ball on the party button, from Google's Noto emoji.
+  - the animated emoji in the greeting and the party button's disco ball, from Google's Noto emoji.
 - **The music screen only hears what the TV is playing.** The microphone is used only when you press the mic.
 - **Notifications are not read,** except those of timers and alarms, so the clock can show them.
 

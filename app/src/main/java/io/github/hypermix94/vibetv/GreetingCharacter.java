@@ -17,9 +17,9 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
- * The music screen's spinning disco ball: Google's Noto Animated Emoji (CC BY 4.0), downloaded once into the app's
- * files and decoded at the small size it is shown at. Consumer gets null when there is no animation (offline, or none
- * exists for that emoji), and the button then keeps the plain emoji.
+ * Google's Noto Animated Emoji (CC BY 4.0) for the greeting's emoji and the music screen's disco ball, downloaded once
+ * into the app's files and decoded at the small size it is shown at. Consumer gets null when there is no animation
+ * (offline, or none exists for that emoji), and the plain emoji stays.
  */
 final class GreetingCharacter {
     private final Context context;
