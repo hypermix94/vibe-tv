@@ -122,13 +122,9 @@ public class SettingsActivity extends Activity {
         TextView title = Cards.text(this, s, 64, R.font.outfit_medium, Color.WHITE);
         title.setText("Home settings");
         title.setLetterSpacing(-0.03f);
-        column.addView(title);
-        TextView sub = Cards.text(this, s, 26, R.font.outfit_regular, 0x99FFFFFF);
-        sub.setText("vibe-tv · Left and Right change a setting, OK types");
-        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-2, -2);
-        subLp.topMargin = d(12);
-        subLp.bottomMargin = d(36);
-        column.addView(sub, subLp);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-2, -2);
+        titleLp.bottomMargin = d(40);
+        column.addView(title, titleLp);
         for (Row r : rows) {
             LinearLayout row = new LinearLayout(this);
             row.setGravity(Gravity.CENTER_VERTICAL);
