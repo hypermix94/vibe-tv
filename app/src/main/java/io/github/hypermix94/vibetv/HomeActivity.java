@@ -96,13 +96,50 @@ public class HomeActivity extends Activity {
         paintFocus(false);
         showHero(true);
         enter();
+        loadWallpaper();
+        // An app installed, updated or removed while Home stays open: rebuild the lists when Home is next shown.
+        android.content.IntentFilter apps = new android.content.IntentFilter();
+        apps.addAction(Intent.ACTION_PACKAGE_ADDED);
+        apps.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        apps.addAction(Intent.ACTION_PACKAGE_CHANGED);
+        apps.addAction(Intent.ACTION_PACKAGE_REPLACED);
+        apps.addDataScheme("package");
+        registerReceiver(appsChanged, apps);
+    }
+
+    private boolean appsStale;
+    private final android.content.BroadcastReceiver appsChanged = new android.content.BroadcastReceiver() {
+        @Override
+        public void onReceive(android.content.Context c, Intent i) {
+            appsStale = true;
+            if (hasWindowFocus()) recreate();
+        }
+    };
+
+    @Override
+    protected void onDestroy() {
+        unregisterReceiver(appsChanged);
+        super.onDestroy();
+    }
+
+    /** The day the wallpaper on screen belongs to; Home stays open for days, so it checks for a new one. */
+    private int wallpaperDay = -1;
+
+    private void loadWallpaper() {
+        int day = Calendar.getInstance().get(Calendar.DAY_OF_YEAR);
+        if (day == wallpaperDay) return;
+        wallpaperDay = day;
         new Thread(() -> {
             DailyWallpaper.Picture p = DailyWallpaper.today(this);
             main.post(() -> {
-                if (p == null || isDestroyed()) return;
-                wallpaper.setAlpha(0f);
+                if (p == null || isDestroyed()) {
+                    wallpaperDay = -1;   // try again later
+                    return;
+                }
+                boolean first = wallpaper.getDrawable() == null;
+                if (first) wallpaper.setAlpha(0f);
                 wallpaper.setImageBitmap(p.bitmap);
-                wallpaper.animate().alpha(1f).setDuration(1200).setInterpolator(EASE_OUT).start();
+                if (first) wallpaper.animate().alpha(1f).setDuration(1200).setInterpolator(EASE_OUT).start();
                 credit.setText(p.credit);
             });
         }, "wallpaper").start();
@@ -111,7 +148,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (Apps.revision(this) != builtRevision) {   // apps were added or put back on another page
+        if (appsStale || Apps.revision(this) != builtRevision) {   // apps were installed, added or put back elsewhere
             recreate();
             return;
         }
@@ -125,6 +162,7 @@ public class HomeActivity extends Activity {
             }
         }
         main.post(tick);
+        loadWallpaper();   // a new day's picture
         showHero(true);   // "last opened" may have changed
     }
 
@@ -874,7 +912,10 @@ public class HomeActivity extends Activity {
                 paintFocus(true);
             }
             lineKind = kind;
-            if (DateFormat.format("ss", now).toString().equals("00")) greetingLine();
+            if (DateFormat.format("ss", now).toString().equals("00")) {
+                greetingLine();
+                loadWallpaper();   // past midnight: the new day's picture
+            }
             if (wifiIcon != null && now.getTime() / 1000 % 10 == 0) wifiIcon.refresh();
             main.postDelayed(this, 1000 - System.currentTimeMillis() % 1000 + 10);
         }

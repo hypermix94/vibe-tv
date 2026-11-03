@@ -146,16 +146,30 @@ public class SettingsActivity extends Activity {
             column.addView(row, new LinearLayout.LayoutParams(-1, d(86)));
             r.view = row;
         }
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(d(1200), -2, Gravity.TOP | Gravity.START);
-        lp.setMargins(d(112), d(96), 0, 0);
-        root.addView(column, lp);
+        // More rows than fit on screen: they scroll, keeping the focused one in view.
+        scroll = new android.widget.ScrollView(this);
+        scroll.setFocusable(false);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setClipToPadding(false);
+        scroll.setPadding(d(112), d(96), 0, d(96));
+        scroll.addView(column, new FrameLayout.LayoutParams(d(1200), -2));
+        root.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
         column.setAlpha(0f);
         column.setTranslationY(d(24));
         column.animate().alpha(1f).translationY(0).setDuration(600).setInterpolator(EASE_OUT).start();
         return root;
     }
 
+    private android.widget.ScrollView scroll;
+
     private void paint(boolean animate) {
+        View focused = rows.get(focus).view;
+        scroll.post(() -> {   // the focused row in the middle of the screen, where there is room to scroll
+            int y = scroll.getPaddingTop() + focused.getTop() + focused.getHeight() / 2 - scroll.getHeight() / 2;
+            y = Math.max(0, y);
+            if (animate) scroll.smoothScrollTo(0, y);
+            else scroll.scrollTo(0, y);
+        });
         for (int i = 0; i < rows.size(); i++) {
             Row r = rows.get(i);
             boolean on = i == focus;
