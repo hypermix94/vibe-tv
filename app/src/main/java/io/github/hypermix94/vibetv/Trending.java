@@ -27,13 +27,14 @@ import java.util.Map;
  * API but is not endorsed or certified by TMDB.
  */
 final class Trending {
-    /** One title: its name and where its wide picture is kept. */
+    /** One title: its name, where its wide picture is kept, and its own title logo when it has one (else ""). */
     static final class Item {
-        final String title, picture;
+        final String title, picture, logo;
 
-        Item(String title, String picture) {
+        Item(String title, String picture, String logo) {
             this.title = title;
             this.picture = picture;
+            this.logo = logo;
         }
     }
 
@@ -63,7 +64,7 @@ final class Trending {
     }
 
     private static SharedPreferences prefs(Context c) {
-        return c.getSharedPreferences("trending", Context.MODE_PRIVATE);
+        return c.getSharedPreferences("trending2", Context.MODE_PRIVATE);
     }
 
     /** The last list for an app, whose pictures are on disk; empty before the first answer. */
@@ -73,7 +74,9 @@ final class Trending {
             JSONArray a = new JSONArray(prefs(c).getString(pkg, "[]"));
             for (int i = 0; i < a.length(); i++) {
                 JSONObject o = a.getJSONObject(i);
-                if (new File(o.getString("p")).exists()) out.add(new Item(o.getString("t"), o.getString("p")));
+                String logo = o.optString("l");
+                if (!logo.isEmpty() && !new File(logo).exists()) logo = "";
+                if (new File(o.getString("p")).exists()) out.add(new Item(o.getString("t"), o.getString("p"), logo));
             }
         } catch (Exception ignored) {
             // nothing kept yet
@@ -108,7 +111,7 @@ final class Trending {
                 JSONArray a = r.getJSONArray("results");
                 for (int i = 0; i < a.length(); i++) {
                     JSONObject o = a.getJSONObject(i);
-                    if (!o.optString("backdrop_path").isEmpty()) found.add(o);
+                    if (!o.optString("backdrop_path").isEmpty()) found.add(o.put("kind", kind));
                 }
             }
             found.sort((x, y) -> Double.compare(y.optDouble("popularity"), x.optDouble("popularity")));
@@ -126,7 +129,7 @@ final class Trending {
                     }
                 }
                 String title = o.has("name") ? o.getString("name") : o.optString("title");
-                keep.put(new JSONObject().put("t", title).put("p", f.getAbsolutePath()));
+                keep.put(new JSONObject().put("t", title).put("p", f.getAbsolutePath()).put("l", titleLogo(c, dir, o)));
             }
             if (keep.length() == 0) return false;
             p.edit().putString(pkg, keep.toString()).putBoolean("ok_" + pkg, true).apply();
@@ -134,6 +137,37 @@ final class Trending {
         } catch (Exception e) {
             return false;   // no network, or a bad key: the logos stay, and it asks again later
         }
+    }
+
+    /**
+     * The title's own logo (its name drawn in the show's own lettering, as on its poster), English or wordless, as a
+     * PNG with a clear background; "" when TMDB has none.
+     */
+    private static String titleLogo(Context c, File dir, JSONObject o) {
+        try {
+            JSONArray logos = new JSONObject(get(c, "https://api.themoviedb.org/3/" + o.getString("kind") + "/" + o.getLong("id")
+                    + "/images?include_image_language=en,null&api_key=" + c.getString(R.string.tmdb_key))).optJSONArray("logos");
+            for (int i = 0; logos != null && i < logos.length(); i++) {
+                String path = logos.getJSONObject(i).getString("file_path");
+                if (!path.endsWith(".png")) continue;   // SVG logos cannot be drawn here
+                File f = new File(dir, "logo" + path.replaceAll("[^A-Za-z0-9.]", ""));
+                if (!f.exists()) {
+                    byte[] img = bytes("https://image.tmdb.org/t/p/w500" + path);
+                    try (FileOutputStream out = new FileOutputStream(f)) {
+                        out.write(img);
+                    }
+                }
+                return f.getAbsolutePath();
+            }
+        } catch (Exception ignored) {
+            // no logo: the name in words
+        }
+        return "";
+    }
+
+    /** A title logo, decoded with its clear background. */
+    static Bitmap logo(String path) {
+        return path.isEmpty() ? null : BitmapFactory.decodeFile(path);
     }
 
     /** A kept picture, decoded no wider than the screen needs. */

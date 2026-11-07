@@ -59,6 +59,8 @@ public class StageActivity extends Activity {
     private int picOn;
     private View veil, chevron;
     private TextView title, line, gridName;
+    /** A trending title's own logo, in place of its name in words. */
+    private ImageView titleLogo;
     private LinearLayout words, dots;
     private final List<App> dock = new ArrayList<>(), others = new ArrayList<>();
     private final List<FrameLayout> trayTiles = new ArrayList<>(), gridTiles = new ArrayList<>();
@@ -233,7 +235,8 @@ public class StageActivity extends Activity {
         veil.setBackground(new android.graphics.drawable.LayerDrawable(new Drawable[]{
                 new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                         new int[]{0x59000000, 0x00000000, 0x00000000, 0x73000000, 0xB3000000}),
-                new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{0x66000000, 0x00000000, 0x00000000})}));
+                new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{0x66000000, 0x00000000, 0x00000000}),
+                corner()}));
         root.addView(veil, match());
 
         page = new FrameLayout(this);
@@ -261,6 +264,16 @@ public class StageActivity extends Activity {
         // A soft shadow keeps the words readable over bright artwork (a yellow cartoon, a white sky).
         title.setShadowLayer(d(24), 0, d(2), 0x99000000);
         line.setShadowLayer(d(12), 0, d(1), 0xB3000000);
+        titleLogo = new ImageView(this);
+        titleLogo.setAdjustViewBounds(true);
+        titleLogo.setScaleType(ImageView.ScaleType.FIT_START);
+        titleLogo.setMaxWidth(d(640));
+        titleLogo.setMaxHeight(d(170));
+        titleLogo.setVisibility(View.GONE);
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(-2, -2);
+        tl.topMargin = d(24);
+        tl.bottomMargin = d(18);
+        words.addView(titleLogo, tl);
         words.addView(title);
         words.addView(line, lineLp);
         page.addView(words, at(d(1100), -2, Gravity.TOP | Gravity.START, LEFT, 72, 0, 0));
@@ -358,7 +371,7 @@ public class StageActivity extends Activity {
     }
 
     private final Runnable stageNow = () -> stage(true);
-    /** Which trending title shows for the focused app; the next one comes every six seconds. */
+    /** Which trending title shows for the focused app; the next one comes every fifteen seconds. */
     private int slide;
     private String slidePkg = "";
     private final Runnable nextSlide = () -> {
@@ -389,6 +402,7 @@ public class StageActivity extends Activity {
             List<Trending.Item> hot = Trending.enabled(this) && Trending.covers(a.pkg) ? Trending.cached(this, a.pkg) : new ArrayList<>();
             Trending.Item item = hot.isEmpty() ? null : hot.get(slide % hot.size());
             Bitmap pic = item != null ? Trending.picture(item.picture) : null;
+            Bitmap showLogo = item != null ? Trending.logo(item.logo) : null;
             if (Trending.enabled(this) && Trending.covers(a.pkg)) {
                 new Thread(() -> {
                     if (Trending.refresh(this, a.pkg)) main.post(() -> {
@@ -466,12 +480,14 @@ public class StageActivity extends Activity {
                 // The name, large at the top left for every app, as on Apple TV; the line under it says what is on.
                 boolean bigName = true;
                 title.setText(item != null ? item.title : a.label);
-                title.setVisibility(View.VISIBLE);
-                String what = item != null ? "Trending on " + android.text.TextUtils.htmlEncode(a.label) + " · from TMDB"
+                titleLogo.setImageBitmap(showLogo);
+                titleLogo.setVisibility(showLogo != null ? View.VISIBLE : View.GONE);   // the show's own lettering
+                title.setVisibility(showLogo != null ? View.GONE : View.VISIBLE);
+                String what = item != null ? "Trending on " + android.text.TextUtils.htmlEncode(a.label)
                         : said.isEmpty() ? lastOpened(a.pkg) : "Last played " + android.text.TextUtils.htmlEncode(said);
                 line.setText(android.text.Html.fromHtml(bigName ? what
                         : "<b>" + android.text.TextUtils.htmlEncode(a.label) + "</b> · " + what, android.text.Html.FROM_HTML_MODE_LEGACY));
-                if (hot.size() > 1) main.postDelayed(nextSlide, 6000);
+                if (hot.size() > 1) main.postDelayed(nextSlide, 15_000);
                 dots.removeAllViews();
                 for (int i = 0; item != null && hot.size() > 1 && i < hot.size(); i++) {
                     View dot = new View(this);
@@ -529,6 +545,14 @@ public class StageActivity extends Activity {
                     stack[top++] = n;
                 }
             }
+        }
+        // Dark grey lettering made for a white banner would vanish on the dark stage: it turns white; colour stays.
+        float[] hsv = new float[3];
+        for (int i = 0; i < px.length; i++) {
+            int c = px[i];
+            if (Color.alpha(c) == 0) continue;
+            Color.colorToHSV(c, hsv);
+            if (hsv[1] < 0.25f && hsv[2] < 0.45f) px[i] = (c & 0xFF000000) | 0x00FFFFFF;
         }
         b.setPixels(px, 0, w, 0, 0, w, h);
         return b;
@@ -606,6 +630,16 @@ public class StageActivity extends Activity {
         }
         if (n < 8) return NO_GLOW;
         return Color.rgb((int) (r / n), (int) (g / n), (int) (bl / n));
+    }
+
+    /** A soft shade in the top left corner, behind the title and its line, so they read over any picture. */
+    private Drawable corner() {
+        GradientDrawable g = new GradientDrawable();
+        g.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        g.setGradientCenter(0.12f, 0.14f);
+        g.setGradientRadius(d(900));
+        g.setColors(new int[]{0x8C000000, 0x4D000000, 0x00000000});
+        return g;
     }
 
     /** A dark stage lit softly from the right in {@code colour}, like light from off screen. */
