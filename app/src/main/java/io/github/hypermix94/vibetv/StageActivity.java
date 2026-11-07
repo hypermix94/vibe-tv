@@ -414,6 +414,11 @@ public class StageActivity extends Activity {
                 }, "trending").start();
             }
             Bitmap art = pic != null ? pic : NowPlaying.loadArt(this, a.pkg);
+            // Music: the album's own main colour fills the screen, as on Spotify's screensaver, and the cover sits
+            // on the right with rounded corners and a soft shadow.
+            boolean square = pic == null && art != null && art.getWidth() < art.getHeight() * 1.3f;
+            int albumColour = square ? MusicScreen.primary(art) : 0;
+            Bitmap coverCard = square ? card(art, d(560), d(18), d(48)) : null;
             Bitmap own = ownLogo(a.pkg);
             Bitmap logo = own != null ? trim(unmatte(own)) : null;
             int logoGlow = glowColour(own, null);   // a white logo has no colour of its own: then the banner's
@@ -454,16 +459,14 @@ public class StageActivity extends Activity {
                     } else {
                         f.setBackground(glow(glow));
                     }
-                } else if (art.getWidth() < art.getHeight() * 1.3f) {
-                    // A square cover: large on the right, over itself spread and softened across the screen.
-                    p.setImageBitmap(art);
-                    p.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    p.setPadding(d(1240), d(150), d(80), d(1080 - 150 - 600));   // between the time pill and the tray, flush with the tray's right
-                    p.setClipToOutline(false);
-                    f.setBackgroundColor(Color.BLACK);
-                    f.setImageBitmap(art);   // the cover, spread and softened behind itself
-                    f.setColorFilter(0x8C000000, android.graphics.PorterDuff.Mode.SRC_ATOP);
-                    if (Build.VERSION.SDK_INT >= 31) f.setRenderEffect(RenderEffect.createBlurEffect(d(80), d(80), Shader.TileMode.CLAMP));
+                } else if (square) {
+                    p.setImageBitmap(coverCard);
+                    p.setScaleType(ImageView.ScaleType.CENTER);
+                    // On the right, its middle level with the space between the time pill and the tray.
+                    int cw = coverCard.getWidth(), ch = coverCard.getHeight();
+                    int right = d(1920 - 120) , midY = d(445);
+                    p.setPadding(right - cw, midY - ch / 2, d(1920) - right, d(1080) - midY - ch / 2);
+                    f.setBackgroundColor(albumColour);
                 } else {
                     p.setImageBitmap(art);
                     p.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -476,7 +479,7 @@ public class StageActivity extends Activity {
                 pics[picOn].animate().alpha(0f).setDuration(ms).start();
                 fills[picOn].animate().alpha(0f).setDuration(ms).start();
                 picOn = next;
-                veil.animate().alpha(plain ? 0.6f : 1f).setDuration(ms).start();
+                veil.animate().alpha(plain ? 0.6f : square ? 0.45f : 1f).setDuration(ms).start();   // music: the album colour stays a clean field
                 // The name, large at the top left for every app, as on Apple TV; the line under it says what is on.
                 boolean bigName = true;
                 title.setText(item != null ? item.title : a.label);
@@ -630,6 +633,23 @@ public class StageActivity extends Activity {
         }
         if (n < 8) return NO_GLOW;
         return Color.rgb((int) (r / n), (int) (g / n), (int) (bl / n));
+    }
+
+    /** A picture with rounded corners on a soft drop shadow, {@code size} wide, with room around it for the shadow. */
+    private static Bitmap card(Bitmap art, int size, int radius, int shadow) {
+        Bitmap out = Bitmap.createBitmap(size + 2 * shadow, size + 2 * shadow, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        android.graphics.RectF box = new android.graphics.RectF(shadow, shadow, shadow + size, shadow + size);
+        android.graphics.Paint shade = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        shade.setColor(Color.BLACK);
+        shade.setShadowLayer(shadow * 0.6f, 0, shadow * 0.3f, 0x8C000000);
+        c.drawRoundRect(box, radius, radius, shade);
+        android.graphics.Paint img = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
+        Bitmap scaled = Bitmap.createScaledBitmap(art, size, size, true);
+        img.setShader(new android.graphics.BitmapShader(scaled, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+        c.translate(shadow, shadow);
+        c.drawRoundRect(new android.graphics.RectF(0, 0, size, size), radius, radius, img);
+        return out;
     }
 
     /** A soft shade in the top left corner, behind the title and its line, so they read over any picture. */

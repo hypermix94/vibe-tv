@@ -505,7 +505,7 @@ final class MusicScreen extends android.content.ContextWrapper {
      * The cover's main colour, as Spotify uses it: the hue that covers most of the cover (colourful pixels count
      * more, so a white border does not win), averaged, then toned down so white text reads on it.
      */
-    private static int primary(Bitmap art) {
+    static int primary(Bitmap art) {
         Bitmap tiny = Bitmap.createScaledBitmap(art, 16, 16, true);
         int[] px = new int[256];
         tiny.getPixels(px, 0, 16, 0, 0, 16, 16);
