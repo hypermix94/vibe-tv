@@ -1268,13 +1268,13 @@ public class StageActivity extends Activity {
             clock.setPadding(d(18), 0, d(18), 0);
             bar.addView(clock, new LinearLayout.LayoutParams(-2, d(50)));
             mods.add(clock);
+            // Every button in the bar keeps a clear gap from the next, highlighted or not.
             for (int icon : new int[]{R.drawable.ic_cc_timer}) {
                 ImageView v = new ImageView(StageActivity.this);
                 v.setImageResource(icon);
                 v.setPadding(d(11), d(11), d(11), d(11));
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(d(50), d(50));
-                lp.leftMargin = d(3);
-                lp.rightMargin = d(3);
+                lp.leftMargin = d(10);
                 bar.addView(v, lp);
                 v.setVisibility(View.GONE);   // at rest only the time and your picture show
                 mods.add(v);
@@ -1287,7 +1287,7 @@ public class StageActivity extends Activity {
             av.setShape(GradientDrawable.OVAL);
             me.setBackground(av);
             LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(d(50), d(50));
-            mlp.leftMargin = d(6);
+            mlp.leftMargin = d(12);
             bar.addView(me, mlp);
             root.addView(bar, at(-2, d(64), Gravity.TOP | Gravity.END, 0, 60, 80, 0));
 
