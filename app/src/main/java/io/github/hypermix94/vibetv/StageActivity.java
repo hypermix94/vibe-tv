@@ -1372,7 +1372,13 @@ public class StageActivity extends Activity {
             b.setTag("sub");
             b.setSingleLine(true);
             txt.addView(b);
-            if (i == WIFI) {   // a long network name gets two lines
+            if (i != WIFI) b.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            if (i == WIFI) {   // a long network name gets two lines; a long status scrolls slowly to its end
+                b.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+                b.setMarqueeRepeatLimit(-1);
+                b.setHorizontalFadingEdgeEnabled(true);
+                b.setFadingEdgeLength(d(20));
+                b.setSelected(true);
                 a.setSingleLine(false);
                 a.setMaxLines(2);
                 a.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, d(27));
@@ -1426,12 +1432,11 @@ public class StageActivity extends Activity {
                     String ssid = info.getSSID();
                     if (ssid == null || ssid.contains("unknown ssid")) ssid = "Wi-Fi";
                     wifiName.setText(ssid.replace("\"", ""));
-                    int level = WifiManager.calculateSignalLevel(info.getRssi(), 4);
-                    String strength = new String[]{"Weak", "Fair", "Good", "Excellent"}[Math.max(0, Math.min(3, level))];
-                    int speed = info.getLinkSpeed();
-                    // The link rate is how fast TV and router talk, not the internet: OK measures that.
-                    wifiSub.setText(internetMbps >= 0 ? "Internet " + internetMbps + " Mbps"
-                            : testing ? "Measuring speed\u2026" : speed > 0 ? strength + " · Link " + speed + " Mbps" : strength);
+                    // The internet's real speed, from the speed test (the Wi-Fi link rate is not the internet's).
+                    boolean online = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+                    wifiSub.setText(!online || internetMbps == 0 ? "Connected · No internet"
+                            : internetMbps > 0 ? "Connected · " + internetMbps + " Mbps"
+                            : testing ? "Connected · Checking speed\u2026" : "Connected");
                 }
             } catch (RuntimeException e) {
                 wifiName.setText("Wi-Fi");
@@ -1707,7 +1712,7 @@ public class StageActivity extends Activity {
                     refresh();
                     if (result < 0) {
                         testedAt = 0;   // try again next time the panel opens
-                        wifiSub.setText("Couldn't reach the internet");
+                        wifiSub.setText("Connected · No internet");
                     }
                 });
             }, "speed-test").start();
