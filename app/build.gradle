@@ -29,6 +29,10 @@ android {
         resValue 'string', 'weather_place', local.getProperty('stage.weatherPlace', local.getProperty('vibetv.weatherPlace', ''))
         resValue 'string', 'weather_latitude', local.getProperty('stage.weatherLatitude', local.getProperty('vibetv.weatherLatitude', ''))
         resValue 'string', 'weather_longitude', local.getProperty('stage.weatherLongitude', local.getProperty('vibetv.weatherLongitude', ''))
+        // Your free TMDB key (themoviedb.org, Settings, API), for what is trending on each streaming app, e.g.
+        //   stage.tmdbKey=0123456789abcdef
+        // Left out: the home screen shows each app's logo instead.
+        resValue 'string', 'tmdb_key', local.getProperty('stage.tmdbKey', '')
     }
 
     buildTypes {

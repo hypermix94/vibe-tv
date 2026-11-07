@@ -124,6 +124,7 @@ public class StageActivity extends Activity {
     @Override
     protected void onPause() {
         main.removeCallbacks(tick);
+        main.removeCallbacks(nextSlide);
         super.onPause();
     }
 
@@ -347,6 +348,14 @@ public class StageActivity extends Activity {
     }
 
     private final Runnable stageNow = () -> stage(true);
+    /** Which trending title shows for the focused app; the next one comes every six seconds. */
+    private int slide;
+    private String slidePkg = "";
+    private final Runnable nextSlide = () -> {
+        if (zone != Zone.TRAY || !hasWindowFocus()) return;
+        slide++;
+        stage(true);
+    };
 
     /**
      * The focused app on the whole screen: what it last played, full bleed. Else its banner, large: a banner on white
@@ -356,12 +365,31 @@ public class StageActivity extends Activity {
     private void stage(boolean animate) {
         App a = focused();
         if (a == null) return;
-        String key = a.pkg + "/" + NowPlaying.artTime(this, a.pkg);
+        if (!a.pkg.equals(slidePkg)) {
+            slidePkg = a.pkg;
+            slide = 0;
+        }
+        String key = a.pkg + "/" + NowPlaying.artTime(this, a.pkg) + "/" + slide;
         if (key.equals(stageKey)) return;
         stageKey = key;
+        main.removeCallbacks(nextSlide);
         String said = NowPlaying.loadTitle(this, a.pkg);
         new Thread(() -> {
-            Bitmap art = NowPlaying.loadArt(this, a.pkg);
+            // What is trending on a streaming app comes first (with your TMDB key); a new list redraws the stage.
+            List<Trending.Item> hot = Trending.enabled(this) && Trending.covers(a.pkg) ? Trending.cached(this, a.pkg) : new ArrayList<>();
+            Trending.Item item = hot.isEmpty() ? null : hot.get(slide % hot.size());
+            Bitmap pic = item != null ? Trending.picture(item.picture) : null;
+            if (Trending.enabled(this) && Trending.covers(a.pkg)) {
+                new Thread(() -> {
+                    if (Trending.refresh(this, a.pkg)) main.post(() -> {
+                        if (a.pkg.equals(slidePkg)) {
+                            stageKey = "";
+                            stage(true);
+                        }
+                    });
+                }, "trending").start();
+            }
+            Bitmap art = pic != null ? pic : NowPlaying.loadArt(this, a.pkg);
             Bitmap logo = art == null ? ownLogo(a.pkg) : null;
             boolean light = art == null && a.banner != null && luminance(colourOf(a)) > 0.7f;
             Bitmap mark = light ? cutOut(a.banner, colourOf(a)) : art == null && a.banner != null ? feather(a.banner) : null;
@@ -407,10 +435,15 @@ public class StageActivity extends Activity {
                 fills[picOn].animate().alpha(0f).setDuration(ms).start();
                 picOn = next;
                 veil.animate().alpha(plain ? 0.6f : 1f).setDuration(ms).start();
-                // The name shows over a picture; over the app's own banner, the banner already says it.
-                title.setText(a.label);
-                title.setVisibility(plain && a.banner != null ? View.GONE : View.VISIBLE);
-                line.setText(said.isEmpty() ? lastOpened(a.pkg) : "Last played " + said);
+                // The name shows large over a picture; over the app's own logo or banner, small in the line under it.
+                boolean bigName = !plain;
+                title.setText(item != null ? item.title : a.label);
+                title.setVisibility(bigName ? View.VISIBLE : View.GONE);
+                String what = item != null ? "Trending on " + android.text.TextUtils.htmlEncode(a.label) + " · from TMDB"
+                        : said.isEmpty() ? lastOpened(a.pkg) : "Last played " + android.text.TextUtils.htmlEncode(said);
+                line.setText(android.text.Html.fromHtml(bigName ? what
+                        : "<b>" + android.text.TextUtils.htmlEncode(a.label) + "</b> · " + what, android.text.Html.FROM_HTML_MODE_LEGACY));
+                if (hot.size() > 1) main.postDelayed(nextSlide, 6000);
                 if (animate) {
                     words.setAlpha(0f);
                     words.animate().alpha(zone == Zone.TRAY ? 1f : 0f).setDuration(500).start();

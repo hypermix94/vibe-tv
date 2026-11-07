@@ -122,7 +122,13 @@ and an Android TV or Google TV with network debugging switched on.
    stage.weatherLatitude=51.5072
    stage.weatherLongitude=-0.1276
    stage.dock=com.netflix.ninja,com.google.android.youtube.tv,com.spotify.tv.android
+   stage.tmdbKey=your-free-key
    ```
+
+   `stage.tmdbKey` is a free key from [TMDB](https://www.themoviedb.org/settings/api): with it, the home screen shows
+   what is trending on Netflix, Prime Video, JioHotstar, ZEE5 and Sun NXT behind the tray. This product uses the TMDB
+   API but is not endorsed or certified by TMDB. Your own logos for apps go in `local-logos/logos/<package>.jpg`
+   (white or coloured on black); that folder is never committed.
 
 3. **Build and install:**
 
