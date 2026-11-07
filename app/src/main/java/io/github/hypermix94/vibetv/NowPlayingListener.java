@@ -107,10 +107,10 @@ public class NowPlayingListener extends NotificationListenerService {
     }
 
     /** The screensaver delay while music plays: the music screen comes up after this long without a button press. */
-    private static final int MUSIC_TIMEOUT_MS = 15_000;
+    private static final int MUSIC_TIMEOUT_MS = 60_000;
 
     /**
-     * While a music app plays, the screensaver (the music screen, in party mode) starts after 15 seconds; when the
+     * While a music app plays, the screensaver (the music screen) starts after a minute; when the
      * music stops, the TV's own delay comes back. The usual delay is kept in preferences while it is replaced.
      */
     private void musicTimeout() {

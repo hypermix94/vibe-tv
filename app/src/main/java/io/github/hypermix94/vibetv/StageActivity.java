@@ -1213,7 +1213,7 @@ public class StageActivity extends Activity {
     // ---- the control panel -------------------------------------------------------------------------
 
     /**
-     * Up: the time pill at the top right stretches left into a bar (the time, a running timer, the controls, you) and
+     * Up: the time pill at the top right stretches left into a bar (the time, a running timer, you) and
      * a panel unfolds from under it. Left and Right along the bar swap what the panel shows; Down goes into it.
      * The time opens a card of the time, day, date and weather, its background the weather itself. The controls are
      * Wi-Fi (its name, strength and speed), Inputs, Speakers (where the sound goes), Volume (Left and Right turn it, as
@@ -1268,7 +1268,7 @@ public class StageActivity extends Activity {
             clock.setPadding(d(18), 0, d(18), 0);
             bar.addView(clock, new LinearLayout.LayoutParams(-2, d(50)));
             mods.add(clock);
-            for (int icon : new int[]{R.drawable.ic_cc_timer, R.drawable.ic_cc_toggles}) {
+            for (int icon : new int[]{R.drawable.ic_cc_timer}) {
                 ImageView v = new ImageView(StageActivity.this);
                 v.setImageResource(icon);
                 v.setPadding(d(11), d(11), d(11), d(11));
@@ -1579,12 +1579,17 @@ public class StageActivity extends Activity {
 
         /** Moves within the panel; Left and Right on Volume turn it instead. */
         boolean move(int dx, int dy) {
-            if (inBar) {
-                if (dx > 0 && m < ME) m += m + 1 == TIMER && !timerOn() ? 2 : 1;
-                else if (dx < 0 && m > 0) m -= m - 1 == TIMER && !timerOn() ? 2 : 1;
-                else if (dy > 0 && m < ME) {
+            if (inBar) {   // the bar: the time, a running timer, and you; the controls are under them all
+                if (dx > 0 && m == CLOCK) m = timerOn() ? TIMER : ME;
+                else if (dx > 0 && m == TIMER) m = ME;
+                else if (dx < 0 && m == ME) m = timerOn() ? TIMER : CLOCK;
+                else if (dx < 0 && m == TIMER) m = CLOCK;
+                else if (dy > 0) {   // Down: into the time or timer card, or from you to the controls
                     inBar = false;
-                    q = 0;
+                    if (m == ME) {
+                        m = CONTROLS;
+                        q = 0;
+                    }
                 } else return true;
             } else if (m != CONTROLS) {
                 if (dy < 0) inBar = true;
@@ -1596,7 +1601,10 @@ public class StageActivity extends Activity {
             } else {
                 int n = nextKey(q, dx, dy);
                 if (n >= 0) q = n;
-                else if (dy < 0) inBar = true;
+                else if (dy < 0) {   // up from the controls: onto your picture, nearest them
+                    inBar = true;
+                    m = ME;
+                }
             }
             return true;
         }
@@ -1653,7 +1661,6 @@ public class StageActivity extends Activity {
                 shown = on;
                 // The bar stretches out to the left; the panel unfolds from under its right end.
                 mods.get(TIMER).setVisibility(on && timerOn() ? View.VISIBLE : View.GONE);
-                mods.get(CONTROLS).setVisibility(on ? View.VISIBLE : View.GONE);
                 ((GradientDrawable) bar.getBackground()).setColor(on ? 0x8C464A52 : 0x73282A30);
                 card.setPivotX(d(W) * 0.92f);
                 card.setPivotY(0);
