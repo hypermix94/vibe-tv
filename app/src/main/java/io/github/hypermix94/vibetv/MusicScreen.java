@@ -689,7 +689,7 @@ final class MusicScreen extends android.content.ContextWrapper {
             TextView t = text(28f, R.font.outfit_medium, 0x61FFFFFF, false);
             t.setTypeface(lyricFace());   // bold, like Spotify's lyrics
             t.setShadowLayer(0, 0, 0, 0);   // flat: a shadow muddies the dimmed lines
-            t.setText(line.text);
+            t.setText(line.text.isEmpty() ? "\u266A" : line.text);   // a break in the singing: a note
             t.setLineSpacing(0, 1.08f);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
             lp.bottomMargin = px(18);
@@ -744,12 +744,13 @@ final class MusicScreen extends android.content.ContextWrapper {
             // Plain lyrics: follow the song's progress through the lines.
             now = duration > 0 ? (int) (pos / (float) duration * lineViews.size()) : 0;
         }
+        boolean before = lyrics.timed && now < 0;   // the intro, before the first line is sung: nothing lit yet
         now = Math.max(0, Math.min(now, lineViews.size() - 1));
-        if (now == currentLine) return;
-        currentLine = now;
+        if (now == currentLine && !before) return;
+        currentLine = before ? -1 : now;
         for (int i = 0; i < lineViews.size(); i++) {
             int colour = !lyrics.timed ? 0xB3FFFFFF
-                    : i == now ? Color.WHITE : i < now ? 0x38FFFFFF : 0x61FFFFFF;
+                    : !before && i == now ? Color.WHITE : !before && i < now ? 0x38FFFFFF : 0x61FFFFFF;
             lineViews.get(i).setTextColor(colour);
         }
         // Keep the current line about a third of the way down the screen, gliding there.

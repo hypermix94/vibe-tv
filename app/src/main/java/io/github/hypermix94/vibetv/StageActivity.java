@@ -735,8 +735,8 @@ public class StageActivity extends Activity {
             if (show) {
                 android.media.session.PlaybackState st = live.getPlaybackState();
                 long pos = st == null ? 0 : st.getPosition() + (long) ((android.os.SystemClock.elapsedRealtime() - st.getLastPositionUpdateTime()) * st.getPlaybackSpeed());
-                // A line a little early: the swap below takes a moment, and the eye expects the words with the voice.
-                for (Lyrics.Line l : songLyrics.lines) if (l.at <= pos + 450) text = l.text;
+                // In step with the song's own position, just early enough to cover the quick swap below.
+                for (Lyrics.Line l : songLyrics.lines) if (l.at <= pos + 150) text = l.text;
             }
             if (!text.contentEquals(lyric.getText())) {   // the next line rises in
                 String t = text;

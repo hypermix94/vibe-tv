@@ -178,11 +178,14 @@ final class Lyrics {
                     end = m.end();
                 }
                 String text = row.substring(end).trim();
-                if (at >= 0 && !text.isEmpty()) out.add(new Line(at, text));
+                // An empty stamped line is an instrumental break: kept (as ""), so the last sung line does not stay
+                // lit through the break.
+                if (at >= 0 && (!text.isEmpty() || !out.isEmpty())) out.add(new Line(at, text));
             } else if (!row.trim().isEmpty()) {
                 out.add(new Line(-1, row.trim()));
             }
         }
+        while (!out.isEmpty() && out.get(out.size() - 1).text.isEmpty()) out.remove(out.size() - 1);   // no break at the end
         return out.isEmpty() ? NONE : new Lyrics(out, timed);
     }
 
