@@ -447,11 +447,16 @@ public class StageActivity extends Activity {
 
         lyric = Cards.text(this, s, 36, R.font.outfit_medium, Color.WHITE);
         lyric.setTypeface(Cards.weight(this, R.font.outfit_medium, 700));   // bold, as the music screen's lyrics
-        lyric.setSingleLine(true);
+        lyric.setMaxLines(2);   // a long line wraps onto a second, never more
         lyric.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        lyric.setLineSpacing(0, 1.05f);
         lyric.setShadowLayer(d(14), 0, d(2), 0x99000000);
         lyric.setAlpha(0f);
-        page.addView(lyric, at(d(860), -2, Gravity.TOP | Gravity.START, LEFT, trayTop - 84, 0, 0));   // ends well short of the cover
+        // Sits on a line just above the tray: one line or two, it grows upward, and ends well short of the cover.
+        FrameLayout lyricBox = new FrameLayout(this);
+        lyricBox.setClipChildren(false);
+        lyricBox.addView(lyric, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM | Gravity.START));
+        page.addView(lyricBox, at(d(860), d(110), Gravity.TOP | Gravity.START, LEFT, trayTop - 140, 0, 0));
 
         // Up: the small chevron says the control panel is there.
         chevron = new ImageView(this);
