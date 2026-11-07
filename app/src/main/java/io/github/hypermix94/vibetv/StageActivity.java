@@ -735,17 +735,18 @@ public class StageActivity extends Activity {
             if (show) {
                 android.media.session.PlaybackState st = live.getPlaybackState();
                 long pos = st == null ? 0 : st.getPosition() + (long) ((android.os.SystemClock.elapsedRealtime() - st.getLastPositionUpdateTime()) * st.getPlaybackSpeed());
-                for (Lyrics.Line l : songLyrics.lines) if (l.at <= pos) text = l.text;
+                // A line a little early: the swap below takes a moment, and the eye expects the words with the voice.
+                for (Lyrics.Line l : songLyrics.lines) if (l.at <= pos + 450) text = l.text;
             }
             if (!text.contentEquals(lyric.getText())) {   // the next line rises in
                 String t = text;
-                lyric.animate().alpha(0f).translationY(-d(10)).setDuration(180).withEndAction(() -> {
+                lyric.animate().alpha(0f).translationY(-d(8)).setDuration(90).withEndAction(() -> {
                     lyric.setText(t);
-                    lyric.setTranslationY(d(10));
-                    lyric.animate().alpha(t.isEmpty() ? 0f : 1f).translationY(0).setDuration(320).setInterpolator(EASE).start();
+                    lyric.setTranslationY(d(8));
+                    lyric.animate().alpha(t.isEmpty() ? 0f : 1f).translationY(0).setDuration(220).setInterpolator(EASE).start();
                 }).start();
             }
-            if (live != null) main.postDelayed(this, 300);
+            if (live != null) main.postDelayed(this, 120);
         }
     };
 
