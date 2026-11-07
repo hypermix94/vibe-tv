@@ -81,6 +81,35 @@ final class Apps {
                 || p.contains("tvcenter") || p.equals("com.google.android.tv") || p.contains("livetv");
     }
 
+    /**
+     * What the hold-OK menu offers for getting rid of an app: "Uninstall" for one you installed; "Disable" for one
+     * that came with the TV (YouTube on Google TV, say), which Android cannot uninstall, only switch off; null for the
+     * TV's own Settings, Play Store and live TV, which the TV needs, and for vibe-tv itself.
+     */
+    static String removeAction(Context c, String pkg) {
+        if (pkg.equals(c.getPackageName())) return null;
+        try {
+            android.content.pm.ApplicationInfo ai = c.getPackageManager().getApplicationInfo(pkg, 0);
+            if ((ai.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0) return "Uninstall";
+            boolean needed = pkg.equals("com.android.tv.settings") || pkg.equals("com.android.vending")
+                    || pkg.contains("tvcenter") || pkg.equals("com.google.android.tv") || pkg.contains("livetv");
+            return needed ? null : "Disable";
+        } catch (PackageManager.NameNotFoundException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Uninstall asks Android's own uninstaller; Disable opens the app's page in the TV's Settings, where its Disable
+     * button is, since only the system may switch an app off.
+     */
+    static void remove(Context c, String pkg, String action) {
+        android.net.Uri uri = android.net.Uri.parse("package:" + pkg);
+        Intent i = "Uninstall".equals(action) ? new Intent(Intent.ACTION_DELETE, uri)
+                : new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, uri);
+        c.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+    }
+
     static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }

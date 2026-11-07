@@ -164,11 +164,11 @@ public class HomeActivity extends Activity {
                 return;
             }
         }
-        if (resumedBefore) {   // back from an app: a different greeting
+        if (leftHome) {   // back from an app: a different greeting (the Home key on Home only pauses, so keeps it)
             greetPick += 1 + new java.util.Random().nextInt(4);
             greetingLine();
         }
-        resumedBefore = true;
+        leftHome = false;
         main.post(tick);
         loadWallpaper();   // a new day's picture
         showHero(true);   // "last opened" may have changed
@@ -178,6 +178,27 @@ public class HomeActivity extends Activity {
     protected void onPause() {
         main.removeCallbacks(tick);
         super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        leftHome = true;   // something covered Home: an app, a settings screen or the screensaver
+        super.onStop();
+    }
+
+    /**
+     * Home out of sight: gives back its two big pictures, the full-screen wallpaper and the moving greeting emoji, so
+     * the app in front has the memory. Both come back in onResume (the wallpaper from its file, the emoji with the
+     * next greeting).
+     */
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level < TRIM_MEMORY_UI_HIDDEN) return;
+        wallpaper.setImageDrawable(null);
+        wallpaperDay = -1;
+        characterAnim.setImageDrawable(null);
+        characterText.setVisibility(View.VISIBLE);
     }
 
 
@@ -606,14 +627,19 @@ public class HomeActivity extends Activity {
         App a = focusedApp();
         if (a == null) return;
         boolean inDock = zone == Zone.DOCK;
+        String remove = Apps.removeAction(this, a.pkg);   // Uninstall, Disable, or nothing for the TV's own apps
         String[] items = inDock
-                ? new String[]{"Move", "Remove from dock", "Remove from Home", "App info", "Uninstall"}
-                : new String[]{"Add to dock", "Remove from Home", "App info", "Uninstall"};
+                ? new String[]{"Move", "Remove from dock", "Remove from Home", "App info", remove}
+                : new String[]{"Add to dock", "Remove from Home", "App info", remove};
         int[] icons = inDock
                 ? new int[]{R.drawable.ic_menu_move, R.drawable.ic_menu_dock_remove, R.drawable.ic_menu_hide,
                         R.drawable.ic_menu_info, R.drawable.ic_menu_delete}
                 : new int[]{R.drawable.ic_menu_dock_add, R.drawable.ic_menu_hide, R.drawable.ic_menu_info,
                         R.drawable.ic_menu_delete};
+        if (remove == null) {   // the last item is the remove one: leave it out
+            items = java.util.Arrays.copyOf(items, items.length - 1);
+            icons = java.util.Arrays.copyOf(icons, icons.length - 1);
+        }
         menu = new Menu(this, s, items, icons);
         menu.show(root, focusedTile());
     }
@@ -654,8 +680,8 @@ public class HomeActivity extends Activity {
                         android.net.Uri.parse("package:" + a.pkg)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 break;
             case "Uninstall":
-                startActivity(new Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:" + a.pkg))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            case "Disable":
+                Apps.remove(this, a.pkg, label);
                 break;
             default:
                 break;
@@ -1005,7 +1031,7 @@ public class HomeActivity extends Activity {
 
     /** Which of the greetings shows; a new one each time Home comes back from an app. */
     private int greetPick = new java.util.Random().nextInt(5);
-    private boolean resumedBefore;
+    private boolean leftHome;
 
     /**
      * A funny greeting for the time of day with its animated emoji, swapped with a soft lift. It changes when you come

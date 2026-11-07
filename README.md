@@ -100,6 +100,9 @@ Open **Home settings** from the Apps row or All apps. It is named so it is not c
 
 ## 🛠️ Install
 
+**The easy way:** paste the prompt in [PROMPT.md](PROMPT.md) into an AI coding agent, and it does the steps below
+with you.
+
 You need a Mac or Linux computer with JDK 17 and the Android SDK (platform 34, build-tools 34, platform-tools),
 and an Android TV or Google TV with network debugging switched on.
 

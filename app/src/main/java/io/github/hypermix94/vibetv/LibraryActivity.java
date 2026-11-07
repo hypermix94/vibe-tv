@@ -320,8 +320,11 @@ public class LibraryActivity extends Activity {
         icons.add(R.drawable.ic_menu_open);
         items.add("App info");
         icons.add(R.drawable.ic_menu_info);
-        items.add("Uninstall");
-        icons.add(R.drawable.ic_menu_delete);
+        String remove = Apps.removeAction(this, apps.get(focus).pkg);   // Uninstall, Disable, or nothing for the TV's own
+        if (remove != null) {
+            items.add(remove);
+            icons.add(R.drawable.ic_menu_delete);
+        }
         int[] ic = new int[icons.size()];
         for (int i = 0; i < ic.length; i++) ic[i] = icons.get(i);
         menu = new Menu(this, s, items.toArray(new String[0]), ic);
@@ -351,8 +354,8 @@ public class LibraryActivity extends Activity {
                         android.net.Uri.parse("package:" + a.pkg)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 break;
             case "Uninstall":
-                startActivity(new Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:" + a.pkg))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            case "Disable":
+                Apps.remove(this, a.pkg, label);
                 finish();
                 break;
             case "Add to dock":
