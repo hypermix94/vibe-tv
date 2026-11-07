@@ -44,26 +44,38 @@ final class PartyView extends View {
         super(context);
     }
 
-    /** The song's colours, vivid enough to light a room. */
+    /**
+     * The song's lights: its cover's own colours first, then shades around them on the colour wheel (neighbours,
+     * then opposites), eight in all, vivid enough to light a room. Each is at least 40 degrees from every other, and
+     * they are ordered so one change never lands on a look-alike.
+     */
     void setColours(int[] cover) {
-        int n = Math.max(3, cover.length);
+        final int n = 8;
+        float[] offsets = {0f, 0f, 0f, 40f, -40f, 180f, 140f, -140f};
         int[] p = new int[n];
         for (int i = 0; i < n; i++) {
             float[] c = new float[3];
             Color.colorToHSV(cover[i % cover.length], c);
-            if (i >= cover.length) c[0] = (c[0] + 50f * (i - cover.length + 1)) % 360f;
-            // Colours too alike to tell apart (a cover all in oranges, say) are spread around the wheel instead.
-            for (int j = 0; j < i; j++) {
-                float[] o = new float[3];
-                Color.colorToHSV(p[j], o);
-                float gap = Math.abs(o[0] - c[0]);
-                if (Math.min(gap, 360f - gap) < 40f) c[0] = (o[0] + 75f) % 360f;
+            if (i >= cover.length) c[0] = (c[0] + offsets[i] + 360f) % 360f;
+            for (int tries = 0; tries < 9; tries++) {   // too close to one already chosen: turn it further round
+                boolean clash = false;
+                for (int j = 0; j < i; j++) {
+                    float[] o = new float[3];
+                    Color.colorToHSV(p[j], o);
+                    float gap = Math.abs(o[0] - c[0]);
+                    if (Math.min(gap, 360f - gap) < 40f) clash = true;
+                }
+                if (!clash) break;
+                c[0] = (c[0] + 41f) % 360f;
             }
-            c[1] = Math.max(0.55f, c[1]);
+            c[1] = Math.max(0.6f, c[1]);
             c[2] = 1f;
             p[i] = Color.HSVToColor(c);
         }
-        palette = p;
+        // Visit them stepping three at a time, so the cover's colours and their opposites take turns.
+        int[] order = new int[n];
+        for (int i = 0; i < n; i++) order[i] = p[(i * 3) % n];
+        palette = order;
         lead = previous = 0;
     }
 
