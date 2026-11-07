@@ -11,17 +11,21 @@ import android.os.SystemClock;
 import android.view.View;
 
 /**
- * Party mode: the whole screen washed corner to corner in two of the song's colours. On a strong bass hit (at most every
- * three seconds) the colours move on to the next pair with a slow crossfade, like stage lights; the screen
+ * Party mode: the whole screen washed corner to corner in two of the song's colours. Every fourth beat (once a bar) the
+ * colours move on to the next pair with a quick crossfade, like stage lights on the downbeat; the screen
  * brightens with the bass and eases back between hits, a big hit adds a short flash, and a white glow behind the
  * cover swells with the music. Everything is eased every frame and drawn with two gradients on the graphics chip,
  * so it runs at the screen's full frame rate. MusicScreen feeds it the sound levels and reads {@link #pump()} each
  * frame for the cover.
  */
 final class PartyView extends View {
-    private static final long SWAP_MS = 1400L;       // the crossfade when the colours move on: slow, like stage lights
-    private static final long BEAT_GAP_MS = 3000L;   // the shortest time between two colour changes
+    private static final long SWAP_MS = 600L;        // the crossfade when the colours move on, landing on the beat
+    private static final long BEAT_GAP_MS = 280L;    // two bass hits closer than this are one beat
+    private static final int BEATS_PER_CHANGE = 4;   // the colours move on every fourth beat: once a bar
     private static final long DRIFT_MS = 6000L;      // without a strong beat, the colours still move on this often
+    /** Beats heard so far, and when the colours last moved on. */
+    private int beats;
+    private long lastChange;
     private static final long FLASH_MS = 260L;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -66,11 +70,14 @@ final class PartyView extends View {
     /** Sound levels, 0 to 1, about 20 times a second. A strong rise in the bass is a beat. */
     void setLevels(float b, float m, float t) {
         long now = SystemClock.uptimeMillis();
-        if (b > 0.72f && b - lastBassLevel > 0.18f && now - lastBeat > BEAT_GAP_MS) {
+        if (b > 0.55f && b - lastBassLevel > 0.12f && now - lastBeat > BEAT_GAP_MS) {   // a beat
             lastBeat = now;
-            previous = lead;
-            lead = (lead + 1) % palette.length;
-            swapStart = now;
+            if (++beats % BEATS_PER_CHANGE == 0) {   // the bar's first beat: the lights change
+                lastChange = now;
+                previous = lead;
+                lead = (lead + 1) % palette.length;
+                swapStart = now;
+            }
             if (b > 0.9f) flashStart = now;   // a big hit: a short flash
         }
         lastBassLevel = b;
@@ -127,8 +134,8 @@ final class PartyView extends View {
 
         float w = getWidth(), h = getHeight(), cx = w / 2f, cy = h * 0.42f;
         int n = palette.length;
-        if (now - lastBeat > DRIFT_MS) {   // a quiet song still moves on, slowly
-            lastBeat = now;
+        if (now - lastChange > DRIFT_MS) {   // a song with no clear beat still moves on, slowly
+            lastChange = now;
             previous = lead;
             lead = (lead + 1) % palette.length;
             swapStart = now;
