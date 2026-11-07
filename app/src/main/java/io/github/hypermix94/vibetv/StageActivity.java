@@ -1221,7 +1221,7 @@ public class StageActivity extends Activity {
      */
     private final class ControlPanel {
         private static final int CLOCK = 0, TIMER = 1, CONTROLS = 2, ME = 3, W = 600, PAD = 24;
-        private static final int WIFI = 0, INPUTS = 1, SPEAKERS = 2, VOLUME = 3, BRIGHTNESS = 4;
+        private static final int WIFI = 0, INPUTS = 1, SPEAKERS = 2, VOLUME = 3, H = 409;   // H: the panel's inner height
         private final LinearLayout bar;
         private final TextView clock;
         /** The bar's modules in order: the time, the timer, the controls (your picture is {@link #me}). */
@@ -1238,14 +1238,15 @@ public class StageActivity extends Activity {
         private FrameLayout clockCard;
         private final AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
 
-        private final String[][] KEYS = {{"Wi-Fi", ""}, {"Inputs", "Change input"}, {"Speakers", ""},
-                {"Volume", ""}, {"Brightness", "Picture settings"}};
-        private final int[] ICONS = {0, R.drawable.ic_cc_inputs, R.drawable.ic_cc_sound, R.drawable.ic_cc_sound, R.drawable.ic_cc_bright};
-        /** The Settings page each control opens; null for Volume, which Left and Right turn. */
-        private final String[] KEY_PAGES = {android.provider.Settings.ACTION_WIFI_SETTINGS, "com.android.tv.action.VIEW_INPUTS",
-                "android.settings.AUDIO_OUTPUT_SETTINGS", null, "android.settings.DISPLAY_SETTINGS"};
+        private final String[][] KEYS = {{"Wi-Fi", ""}, {"Inputs", "Change input"}, {"Speakers", ""}, {"Volume", ""}};
+        private final int[] ICONS = {0, R.drawable.ic_cc_inputs, R.drawable.ic_cc_sound, R.drawable.ic_cc_sound};
+        /** The page each control opens; null for Wi-Fi (OK tests the speed) and Volume (Left and Right turn it). */
+        private final String[] KEY_PAGES = {null, "com.android.tv.action.VIEW_INPUTS", "android.settings.AUDIO_OUTPUT_SETTINGS", null};
         /** Where each control sits in the panel, in design pixels: x, y, width, height. */
-        private final int[][] AT = {{0, 0, 266, 266}, {286, 0, 266, 123}, {286, 143, 266, 123}, {0, 286, 552, 123}, {0, 429, 552, 123}};
+        private final int[][] AT = {{0, 0, 266, 266}, {286, 0, 266, 123}, {286, 143, 266, 123}, {0, 286, 552, 123}};
+        /** The last speed test's result in Mbps (-1 before one), and whether one is running. */
+        private int internetMbps = -1;
+        private boolean testing;
 
         ControlPanel() {
             bar = new LinearLayout(StageActivity.this);
@@ -1305,7 +1306,7 @@ public class StageActivity extends Activity {
             card.setClipChildren(false);
             card.setAlpha(0f);
             card.setVisibility(View.INVISIBLE);
-            root.addView(card, at(d(W), d(552 + 2 * PAD), Gravity.TOP | Gravity.END, 0, 140, 80, 0));
+            root.addView(card, at(d(W), d(H + 2 * PAD), Gravity.TOP | Gravity.END, 0, 140, 80, 0));
             for (int i = 0; i < views.length; i++) {
                 views[i] = new FrameLayout(StageActivity.this);
                 views[i].setClipChildren(false);
@@ -1425,7 +1426,10 @@ public class StageActivity extends Activity {
                     int level = WifiManager.calculateSignalLevel(info.getRssi(), 4);
                     String strength = new String[]{"Weak", "Fair", "Good", "Excellent"}[Math.max(0, Math.min(3, level))];
                     int speed = info.getLinkSpeed();
-                    wifiSub.setText(speed > 0 ? strength + " · " + speed + " Mbps" : strength);
+                    // The link rate is how fast TV and router talk, not the internet: OK measures that.
+                    wifiSub.setText(testing ? "Testing your internet\u2026"
+                            : internetMbps >= 0 ? "Internet " + internetMbps + " Mbps · " + strength
+                            : speed > 0 ? strength + " · Link " + speed + " Mbps" : strength);
                 }
             } catch (RuntimeException e) {
                 wifiName.setText("Wi-Fi");
@@ -1644,6 +1648,10 @@ public class StageActivity extends Activity {
                 return;
             }
             if (m == CLOCK) return;   // the time card is to look at
+            if (q == WIFI) {   // OK on Wi-Fi: a real internet speed test
+                speedTest();
+                return;
+            }
             if (q == VOLUME) {   // OK on Volume mutes, or brings the sound back
                 audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, 0);
                 main.postDelayed(this::showVolume, 300);
@@ -1656,6 +1664,50 @@ public class StageActivity extends Activity {
             } catch (RuntimeException e) {
                 // no such page on this TV
             }
+        }
+
+        /**
+         * A real speed test, only when asked: downloads from Cloudflare's speed test for up to six seconds (about 50 MB
+         * at most) and shows the internet's speed in Mbps, measured after the first half second, once the connection
+         * has got going.
+         */
+        private void speedTest() {
+            if (testing) return;
+            testing = true;
+            refresh();
+            new Thread(() -> {
+                int mbps = -1;
+                java.net.HttpURLConnection h = null;
+                try {
+                    h = (java.net.HttpURLConnection) new java.net.URL("https://speed.cloudflare.com/__down?bytes=50000000").openConnection();
+                    h.setConnectTimeout(6000);
+                    h.setReadTimeout(6000);
+                    try (java.io.InputStream in = h.getInputStream()) {
+                        byte[] buf = new byte[65536];
+                        long start = android.os.SystemClock.elapsedRealtime(), from = 0, counted = 0;
+                        for (int n; (n = in.read(buf)) > 0; ) {
+                            long now = android.os.SystemClock.elapsedRealtime();
+                            if (now - start < 500) continue;   // the ramp-up does not count
+                            if (from == 0) from = now;
+                            counted += n;
+                            if (now - start > 6000) break;
+                        }
+                        long ms = android.os.SystemClock.elapsedRealtime() - from;
+                        if (from > 0 && ms > 300) mbps = (int) (counted * 8L / 1000L / ms);
+                    }
+                } catch (Exception ignored) {
+                    // no internet: shown below
+                } finally {
+                    if (h != null) h.disconnect();
+                }
+                int result = mbps;
+                main.post(() -> {
+                    testing = false;
+                    internetMbps = result;
+                    refresh();
+                    if (result < 0) wifiSub.setText("Couldn't reach the internet");
+                });
+            }, "speed-test").start();
         }
 
         /** Opens or closes the panel, and lights what has focus in it. */
