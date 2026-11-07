@@ -83,7 +83,7 @@ final class Trending {
     /** Apps whose trending shows films only (ZEE5's series are mostly daily soaps). */
     private static final java.util.Set<String> MOVIES_ONLY = new java.util.HashSet<>(java.util.Arrays.asList("com.graymatrix.did"));
 
-    private static final long KEEP_MS = 6 * 3600_000L, RETRY_MS = 15 * 60_000L;
+    private static final long KEEP_MS = 6 * 3600_000L, RETRY_MS = 2 * 60_000L;
     private static final int MAX = 8;
 
     private Trending() {
@@ -98,7 +98,7 @@ final class Trending {
     }
 
     private static SharedPreferences prefs(Context c) {
-        return c.getSharedPreferences("trending5", Context.MODE_PRIVATE);
+        return c.getSharedPreferences("trending6", Context.MODE_PRIVATE);
     }
 
     /** The last list for an app, whose pictures are on disk; empty before the first answer. */
