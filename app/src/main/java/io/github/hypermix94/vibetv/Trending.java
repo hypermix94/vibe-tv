@@ -64,7 +64,7 @@ final class Trending {
     }
 
     private static SharedPreferences prefs(Context c) {
-        return c.getSharedPreferences("trending2", Context.MODE_PRIVATE);
+        return c.getSharedPreferences("trending3", Context.MODE_PRIVATE);
     }
 
     /** The last list for an app, whose pictures are on disk; empty before the first answer. */
@@ -115,6 +115,19 @@ final class Trending {
                 }
             }
             found.sort((x, y) -> Double.compare(y.optDouble("popularity"), x.optDouble("popularity")));
+            // The app's own shows first: a title the other streaming apps also carry (older series often stream on
+            // three at once) moves behind the ones only this app has, so each app's slides feel like that app.
+            java.util.Set<String> others = new java.util.HashSet<>();
+            for (Map.Entry<String, String> e : PROVIDERS.entrySet()) {
+                if (!e.getKey().equals(pkg)) others.addAll(java.util.Arrays.asList(e.getValue().split("\\|")));
+            }
+            List<JSONObject> own = new ArrayList<>(), shared = new ArrayList<>();
+            for (int i = 0; i < found.size() && i < 24; i++) {
+                JSONObject o = found.get(i);
+                (onAnother(c, o, region, others) ? shared : own).add(o);
+            }
+            found = new ArrayList<>(own);
+            found.addAll(shared);
             File dir = new File(c.getCacheDir(), "trending");
             dir.mkdirs();
             JSONArray keep = new JSONArray();
@@ -144,6 +157,21 @@ final class Trending {
         } catch (Exception e) {
             return false;   // no network, or a bad key: the logos stay, and it asks again later
         }
+    }
+
+    /** True when the title also streams, in this country, on one of the other apps covered here. */
+    private static boolean onAnother(Context c, JSONObject o, String region, java.util.Set<String> others) {
+        try {
+            JSONObject in = new JSONObject(get(c, "https://api.themoviedb.org/3/" + o.getString("kind") + "/" + o.getLong("id")
+                    + "/watch/providers?api_key=" + c.getString(R.string.tmdb_key))).getJSONObject("results").optJSONObject(region);
+            JSONArray subs = in == null ? null : in.optJSONArray("flatrate");
+            for (int i = 0; subs != null && i < subs.length(); i++) {
+                if (others.contains(String.valueOf(subs.getJSONObject(i).getInt("provider_id")))) return true;
+            }
+        } catch (Exception ignored) {
+            // unknown: treat it as the app's own
+        }
+        return false;
     }
 
     /**
