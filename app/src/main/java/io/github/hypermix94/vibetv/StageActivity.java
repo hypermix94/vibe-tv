@@ -206,6 +206,20 @@ public class StageActivity extends Activity {
         return votes >= 3 ? best : 0xFF1C1C20;
     }
 
+    /** True when every edge of a banner is one plain colour (Spotify's black, Netflix's white), not a gradient. */
+    private static boolean plainEdges(Drawable d) {
+        Bitmap b = Bitmap.createBitmap(32, 18, Bitmap.Config.ARGB_8888);
+        Drawable copy = d.getConstantState() != null ? d.getConstantState().newDrawable().mutate() : d;
+        copy.setBounds(0, 0, 32, 18);
+        copy.draw(new Canvas(b));
+        int first = b.getPixel(0, 0);
+        boolean plain = true;
+        for (int x = 0; x < 32 && plain; x += 2) plain = near(first, b.getPixel(x, 0)) && near(first, b.getPixel(x, 17));
+        for (int y = 0; y < 18 && plain; y += 2) plain = near(first, b.getPixel(0, y)) && near(first, b.getPixel(31, y));
+        b.recycle();
+        return plain;
+    }
+
     private static boolean near(int a, int b) {
         return Math.abs(Color.red(a) - Color.red(b)) + Math.abs(Color.green(a) - Color.green(b))
                 + Math.abs(Color.blue(a) - Color.blue(b)) < 40;
@@ -347,7 +361,14 @@ public class StageActivity extends Activity {
         ImageView img = new ImageView(this);
         if (a.banner != null) {
             img.setImageDrawable(a.banner);
-            img.setScaleType(ImageView.ScaleType.CENTER_CROP);   // a 16:9 banner fills the 5:3 tile, no bars
+            if (plainEdges(a.banner)) {
+                // A banner on a plain colour: its logo gets room inside the tile, the tile's colour fills the margin.
+                img.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                int padX = Math.round(tw * 0.12f), padY = Math.round(th * 0.14f);
+                img.setPadding(d(padX), d(padY), d(padX), d(padY));
+            } else {
+                img.setScaleType(ImageView.ScaleType.CENTER_CROP);   // a gradient banner fills the 5:3 tile, no bars
+            }
             t.addView(img, match());
         } else {
             img.setImageDrawable(a.icon);
@@ -474,7 +495,13 @@ public class StageActivity extends Activity {
                     f.setBackgroundColor(Color.BLACK);
                 }
                 long ms = animate ? 600 : 0;
-                p.animate().alpha(1f).setDuration(ms).start();
+                p.animate().cancel();
+                p.setTranslationY(0);
+                if (square && animate) {   // the album rises into place with a little bounce
+                    p.setTranslationY(d(70));
+                    p.animate().translationY(0).setDuration(750).setInterpolator(new OvershootInterpolator(1.8f)).start();
+                }
+                p.animate().alpha(1f).setDuration(ms).setInterpolator(EASE).start();
                 f.animate().alpha(1f).setDuration(ms).start();
                 pics[picOn].animate().alpha(0f).setDuration(ms).start();
                 fills[picOn].animate().alpha(0f).setDuration(ms).start();
