@@ -1250,7 +1250,7 @@ public class StageActivity extends Activity {
         ControlPanel() {
             bar = new LinearLayout(StageActivity.this);
             bar.setGravity(Gravity.CENTER_VERTICAL);
-            bar.setPadding(d(8), 0, d(8), 0);
+            bar.setPadding(d(7), 0, d(7), 0);
             GradientDrawable pill = new GradientDrawable();
             pill.setColor(0x73282A30);
             pill.setCornerRadius(d(32));
@@ -1274,7 +1274,7 @@ public class StageActivity extends Activity {
                 v.setImageResource(icon);
                 v.setPadding(d(11), d(11), d(11), d(11));
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(d(50), d(50));
-                lp.leftMargin = d(10);
+                lp.leftMargin = d(20);
                 bar.addView(v, lp);
                 v.setVisibility(View.GONE);   // at rest only the time and your picture show
                 mods.add(v);
@@ -1287,7 +1287,7 @@ public class StageActivity extends Activity {
             av.setShape(GradientDrawable.OVAL);
             me.setBackground(av);
             LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(d(50), d(50));
-            mlp.leftMargin = d(12);
+            mlp.leftMargin = d(22);
             bar.addView(me, mlp);
             root.addView(bar, at(-2, d(64), Gravity.TOP | Gravity.END, 0, 60, 80, 0));
 
