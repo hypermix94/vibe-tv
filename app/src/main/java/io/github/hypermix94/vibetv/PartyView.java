@@ -11,16 +11,16 @@ import android.os.SystemClock;
 import android.view.View;
 
 /**
- * Party mode: the whole screen washed corner to corner in two of the song's colours. On every strong bass hit the
- * colours move on to the next pair with a quick crossfade, like stage lights changing on the beat; the screen
+ * Party mode: the whole screen washed corner to corner in two of the song's colours. On a strong bass hit (at most every
+ * three seconds) the colours move on to the next pair with a slow crossfade, like stage lights; the screen
  * brightens with the bass and eases back between hits, a big hit adds a short flash, and a white glow behind the
  * cover swells with the music. Everything is eased every frame and drawn with two gradients on the graphics chip,
  * so it runs at the screen's full frame rate. MusicScreen feeds it the sound levels and reads {@link #pump()} each
  * frame for the cover.
  */
 final class PartyView extends View {
-    private static final long SWAP_MS = 420L;        // the crossfade when the colours move on
-    private static final long BEAT_GAP_MS = 450L;    // the shortest time between two colour changes
+    private static final long SWAP_MS = 1400L;       // the crossfade when the colours move on: slow, like stage lights
+    private static final long BEAT_GAP_MS = 3000L;   // the shortest time between two colour changes
     private static final long FLASH_MS = 260L;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);

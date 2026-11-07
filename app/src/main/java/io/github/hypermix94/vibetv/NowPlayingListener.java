@@ -92,11 +92,41 @@ public class NowPlayingListener extends NotificationListenerService {
                 public void onMetadataChanged(MediaMetadata m) {
                     record(c.getPackageName(), m);
                 }
+
+                @Override
+                public void onPlaybackStateChanged(android.media.session.PlaybackState state) {
+                    musicTimeout();
+                }
             };
             c.registerCallback(cb);
             watched.add(c);
             callbacks.add(cb);
             record(c.getPackageName(), c.getMetadata());
+        }
+        musicTimeout();
+    }
+
+    /** The screensaver delay while music plays: the music screen comes up after this long without a button press. */
+    private static final int MUSIC_TIMEOUT_MS = 15_000;
+
+    /**
+     * While a music app plays, the screensaver (the music screen, in party mode) starts after 15 seconds; when the
+     * music stops, the TV's own delay comes back. The usual delay is kept in preferences while it is replaced.
+     */
+    private void musicTimeout() {
+        try {
+            android.content.ContentResolver cr = getContentResolver();
+            int now = android.provider.Settings.System.getInt(cr, android.provider.Settings.System.SCREEN_OFF_TIMEOUT, 600_000);
+            android.content.SharedPreferences p = getSharedPreferences("music_timeout", MODE_PRIVATE);
+            boolean music = MusicScreen.playingMusic(this) != null;
+            if (music && now != MUSIC_TIMEOUT_MS) {
+                p.edit().putInt("usual", now).apply();
+                android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_OFF_TIMEOUT, MUSIC_TIMEOUT_MS);
+            } else if (!music && now == MUSIC_TIMEOUT_MS) {
+                android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_OFF_TIMEOUT, p.getInt("usual", 600_000));
+            }
+        } catch (RuntimeException ignored) {
+            // no permission to change the delay: the TV's own stays
         }
     }
 

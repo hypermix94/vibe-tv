@@ -11,6 +11,10 @@ import android.graphics.RenderEffect;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.media.AudioManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -61,6 +65,10 @@ public class StageActivity extends Activity {
     private boolean stageIsCard;
     private View veil, chevron;
     private TextView title, line, gridName;
+    /** The line of the song being sung now, just above the tray, while the focused music app plays. */
+    private TextView lyric;
+    private Lyrics songLyrics = Lyrics.NONE;
+    private String songKey = "", playingPkg = "";
     /** A trending title's own logo, in place of its name in words. */
     private ImageView titleLogo;
     private LinearLayout words, dots;
@@ -125,10 +133,27 @@ public class StageActivity extends Activity {
         if (panel != null) panel.refresh();
     }
 
+    /** Home comes back the way you expect: on the tray, with the panel and any menu closed. */
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (menu != null) closeMenu();
+        if (moving) stopMoving();
+        if (zone != Zone.TRAY) {
+            zone = Zone.TRAY;
+            paint(false);
+        }
+    }
+
     @Override
     protected void onPause() {
         main.removeCallbacks(tick);
         main.removeCallbacks(nextSlide);
+        main.removeCallbacks(lyricTick);
+        if (watched != null) {
+            watched.unregisterCallback(songChanged);
+            watched = null;
+        }
         super.onPause();
     }
 
@@ -420,6 +445,13 @@ public class StageActivity extends Activity {
         gridName.setAlpha(0f);
         page.addView(gridName, at(d(tw + 120), -2, Gravity.TOP | Gravity.START, 0, 0, 0, 0));
 
+        lyric = Cards.text(this, s, 36, R.font.outfit_medium, Color.WHITE);
+        lyric.setSingleLine(true);
+        lyric.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        lyric.setShadowLayer(d(14), 0, d(2), 0x99000000);
+        lyric.setAlpha(0f);
+        page.addView(lyric, at(d(1100), -2, Gravity.TOP | Gravity.START, LEFT, trayTop - 84, 0, 0));
+
         // Up: the small chevron says the control panel is there.
         chevron = new ImageView(this);
         ((ImageView) chevron).setImageResource(R.drawable.ic_chevron_up);
@@ -500,11 +532,17 @@ public class StageActivity extends Activity {
             slidePkg = a.pkg;
             slide = 0;
         }
-        String key = a.pkg + "/" + NowPlaying.artTime(this, a.pkg) + "/" + slide;
+        android.media.session.MediaController player = MusicScreen.playingMusic(this);
+        String song = player != null && player.getPackageName().equals(a.pkg) && player.getMetadata() != null
+                ? player.getMetadata().getString(android.media.MediaMetadata.METADATA_KEY_TITLE) : "";
+        String key = a.pkg + "/" + NowPlaying.artTime(this, a.pkg) + "/" + slide + "/" + song;
         if (key.equals(stageKey)) return;
         stageKey = key;
         main.removeCallbacks(nextSlide);
         String said = NowPlaying.loadTitle(this, a.pkg);
+        android.media.session.MediaController live = MusicScreen.playingMusic(this);
+        boolean playingNow = live != null && live.getPackageName().equals(a.pkg);
+        String nowTitle = playingNow && live.getMetadata() != null ? live.getMetadata().getString(android.media.MediaMetadata.METADATA_KEY_TITLE) : null;
         new Thread(() -> {
             // What is trending on a streaming app comes first (with your TMDB key); a new list redraws the stage.
             List<Trending.Item> hot = Trending.enabled(this) && Trending.covers(a.pkg) ? Trending.cached(this, a.pkg) : new ArrayList<>();
@@ -601,10 +639,12 @@ public class StageActivity extends Activity {
                 titleLogo.setVisibility(showLogo != null ? View.VISIBLE : View.GONE);   // the show's own lettering
                 title.setVisibility(showLogo != null ? View.GONE : View.VISIBLE);
                 String what = item != null ? "Trending on " + android.text.TextUtils.htmlEncode(a.label)
+                        : nowTitle != null ? "Playing now · " + android.text.TextUtils.htmlEncode(nowTitle)
                         : said.isEmpty() ? lastOpened(a.pkg) : "Last played " + android.text.TextUtils.htmlEncode(said);
                 line.setText(android.text.Html.fromHtml(bigName ? what
                         : "<b>" + android.text.TextUtils.htmlEncode(a.label) + "</b> · " + what, android.text.Html.FROM_HTML_MODE_LEGACY));
                 if (hot.size() > 1) main.postDelayed(nextSlide, 15_000);
+                followSong(playingNow ? live : null);
                 dots.removeAllViews();
                 for (int i = 0; item != null && hot.size() > 1 && i < hot.size(); i++) {
                     View dot = new View(this);
@@ -623,6 +663,85 @@ public class StageActivity extends Activity {
             });
         }, "stage").start();
     }
+
+    /** The focused music app's song: its lyrics fetched once, then the line being sung shown above the tray. */
+    private void followSong(android.media.session.MediaController live) {
+        main.removeCallbacks(lyricTick);
+        // Listen to the player itself: a new song, a pause or a play redraws the stage (the name, the cover, the colour).
+        if (watched != null && (live == null || watched != live)) {
+            watched.unregisterCallback(songChanged);
+            watched = null;
+        }
+        if (live != null && watched == null) {
+            watched = live;
+            live.registerCallback(songChanged, main);
+        }
+        if (live == null || live.getMetadata() == null) {
+            playingPkg = "";
+            lyric.animate().alpha(0f).setDuration(300).start();
+            return;
+        }
+        playingPkg = live.getPackageName();
+        android.media.MediaMetadata m = live.getMetadata();
+        String name = m.getString(android.media.MediaMetadata.METADATA_KEY_TITLE), who = m.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST);
+        String key = name + "/" + who;
+        if (!key.equals(songKey)) {
+            songKey = key;
+            songLyrics = Lyrics.NONE;
+            String album = m.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM);
+            long duration = m.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION);
+            new Thread(() -> {
+                Lyrics found = Lyrics.find(this, name, who, album, duration);
+                main.post(() -> {
+                    if (key.equals(songKey) && found != null) songLyrics = found;
+                });
+            }, "home-lyrics").start();
+        }
+        lyricTick.run();
+    }
+
+    private android.media.session.MediaController watched;
+    private final Runnable restage = () -> {
+        stageKey = "";
+        stage(true);
+    };
+    private final android.media.session.MediaController.Callback songChanged = new android.media.session.MediaController.Callback() {
+        @Override
+        public void onMetadataChanged(android.media.MediaMetadata metadata) {
+            main.removeCallbacks(restage);
+            main.postDelayed(restage, 1200);   // a moment for the new cover to be saved
+        }
+
+        @Override
+        public void onPlaybackStateChanged(android.media.session.PlaybackState state) {
+            main.removeCallbacks(restage);
+            main.postDelayed(restage, 400);   // "Playing now" or "Last played"
+        }
+    };
+
+    private final Runnable lyricTick = new Runnable() {
+        @Override
+        public void run() {
+            android.media.session.MediaController live = MusicScreen.playingMusic(StageActivity.this);
+            App a = focused();
+            boolean show = zone == Zone.TRAY && live != null && a != null && live.getPackageName().equals(a.pkg) && songLyrics.timed;
+            String text = "";
+            if (show) {
+                android.media.session.PlaybackState st = live.getPlaybackState();
+                long pos = st == null ? 0 : st.getPosition() + (long) ((android.os.SystemClock.elapsedRealtime() - st.getLastPositionUpdateTime()) * st.getPlaybackSpeed());
+                for (Lyrics.Line l : songLyrics.lines) if (l.at <= pos) text = l.text;
+            }
+            if (!text.contentEquals(lyric.getText())) {   // the next line rises in
+                String t = text;
+                lyric.animate().alpha(0f).translationY(-d(10)).setDuration(180).withEndAction(() -> {
+                    lyric.setText(t);
+                    lyric.setTranslationY(d(10));
+                    lyric.animate().alpha(t.isEmpty() ? 0f : 1f).translationY(0).setDuration(320).setInterpolator(EASE).start();
+                }).start();
+            }
+            if (live != null) main.postDelayed(this, 300);
+        }
+    };
 
     private static float luminance(int c) {
         return (0.2126f * Color.red(c) + 0.7152f * Color.green(c) + 0.0722f * Color.blue(c)) / 255f;
@@ -1154,40 +1273,44 @@ public class StageActivity extends Activity {
     // ---- the control panel -------------------------------------------------------------------------
 
     /**
-     * Up: the time pill at the top right stretches left into a bar of modules (what is playing, the weather, a timer,
-     * the controls, you) and a panel unfolds from under it. Left and Right along the bar swap what the panel shows;
-     * Down goes into it. The controls are the TV's own quick settings; on a Sony each opens Sony's Quick Settings
-     * strip, where the values live (other apps cannot read them), and Settings opens the TV's Settings.
+     * Up: the time pill at the top right stretches left into a bar (the time, a running timer, the controls, you) and
+     * a panel unfolds from under it. Left and Right along the bar swap what the panel shows; Down goes into it.
+     * The time opens a card of the time, day, date and weather, its background the weather itself. The controls are
+     * Wi-Fi (its name, strength and speed), Inputs, Speakers (where the sound goes), Volume (Left and Right turn it, as
+     * the remote's keys do) and Brightness (Sony's picture brightness lives in its Picture settings, which it opens).
      */
     private final class ControlPanel {
-        private static final int CONTROLS = 3, ME = 4, W = 600, PAD = 24;
+        private static final int CLOCK = 0, TIMER = 1, CONTROLS = 2, ME = 3, W = 600, PAD = 24;
+        private static final int WIFI = 0, INPUTS = 1, SPEAKERS = 2, VOLUME = 3, BRIGHTNESS = 4;
         private final LinearLayout bar;
         private final TextView clock;
-        private final List<ImageView> mods = new ArrayList<>();
+        /** The bar's modules in order: the time, the timer, the controls (your picture is {@link #me}). */
+        private final List<View> mods = new ArrayList<>();
         private final TextView me;
         private final FrameLayout card;
-        private final FrameLayout[] views = new FrameLayout[4];
+        private final FrameLayout[] views = new FrameLayout[3];
         private final List<FrameLayout> keys = new ArrayList<>();
         private int m = CONTROLS, q;
         private boolean inBar, shown;
-        private TextView timerBig;
+        private TextView timerBig, clockBig, clockDate, wifiName, wifiSub, speakerSub, volumeValue;
+        private WifiIcon wifiIcon;
+        private View volumeFill;
+        private FrameLayout clockCard;
+        private final AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
 
-        private final String[][] KEYS = {
-                {"Picture Off", "Sound keeps playing"}, {"Picture mode", ""}, {"Brightness", ""},
-                {"Speakers", ""}, {"Sleep timer", ""}, {"Power saving", ""}, {"Wide mode", ""},
-                {"Parental controls", ""}, {"Settings", ""}};
-        private final int[] ICONS = {R.drawable.ic_cc_picoff, R.drawable.ic_cc_pmode, R.drawable.ic_cc_bright,
-                R.drawable.ic_cc_sound, R.drawable.ic_cc_timer, R.drawable.ic_cc_leaf, R.drawable.ic_cc_wide,
-                R.drawable.ic_cc_lock, R.drawable.ic_cc_gear};
+        private final String[][] KEYS = {{"Wi-Fi", ""}, {"Inputs", "Change input"}, {"Speakers", ""},
+                {"Volume", ""}, {"Brightness", "Picture settings"}};
+        private final int[] ICONS = {0, R.drawable.ic_cc_inputs, R.drawable.ic_cc_sound, R.drawable.ic_cc_sound, R.drawable.ic_cc_bright};
+        /** The Settings page each control opens; null for Volume, which Left and Right turn. */
+        private final String[] KEY_PAGES = {android.provider.Settings.ACTION_WIFI_SETTINGS, "com.android.tv.action.VIEW_INPUTS",
+                "android.settings.AUDIO_OUTPUT_SETTINGS", null, "android.settings.DISPLAY_SETTINGS"};
         /** Where each control sits in the panel, in design pixels: x, y, width, height. */
-        private final int[][] AT = {{0, 0, 266, 266}, {286, 0, 266, 123}, {286, 143, 266, 123}, {0, 286, 266, 123},
-                {286, 286, 266, 123}, {0, 429, 123, 123}, {143, 429, 123, 123}, {286, 429, 123, 123}, {429, 429, 123, 123}};
+        private final int[][] AT = {{0, 0, 266, 266}, {286, 0, 266, 123}, {286, 143, 266, 123}, {0, 286, 552, 123}, {0, 429, 552, 123}};
 
         ControlPanel() {
-            // The pill, which is also the bar.
             bar = new LinearLayout(StageActivity.this);
             bar.setGravity(Gravity.CENTER_VERTICAL);
-            bar.setPadding(d(26), 0, d(8), 0);
+            bar.setPadding(d(8), 0, d(8), 0);
             GradientDrawable pill = new GradientDrawable();
             pill.setColor(0x73282A30);
             pill.setCornerRadius(d(32));
@@ -1198,21 +1321,22 @@ public class StageActivity extends Activity {
             lt.setInterpolator(LayoutTransition.CHANGE_APPEARING, EASE);
             lt.setInterpolator(LayoutTransition.CHANGE_DISAPPEARING, EASE);
             bar.setLayoutTransition(lt);
+            // The time is the first module: a pill of its own that lights when the remote is on it.
             clock = Cards.text(StageActivity.this, s, 26, R.font.outfit_regular, Color.WHITE);
             clock.setFontFeatureSettings("tnum");
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-2, -2);
-            clp.rightMargin = d(10);
-            bar.addView(clock, clp);
-            int[] modIcons = {R.drawable.ic_cc_wave, R.drawable.ic_weather_cloud_sun, R.drawable.ic_cc_timer, R.drawable.ic_cc_toggles};
-            for (int i = 0; i < modIcons.length; i++) {
+            clock.setGravity(Gravity.CENTER);
+            clock.setPadding(d(18), 0, d(18), 0);
+            bar.addView(clock, new LinearLayout.LayoutParams(-2, d(50)));
+            mods.add(clock);
+            for (int icon : new int[]{R.drawable.ic_cc_timer, R.drawable.ic_cc_toggles}) {
                 ImageView v = new ImageView(StageActivity.this);
-                v.setImageResource(modIcons[i]);
+                v.setImageResource(icon);
                 v.setPadding(d(11), d(11), d(11), d(11));
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(d(50), d(50));
                 lp.leftMargin = d(3);
                 lp.rightMargin = d(3);
                 bar.addView(v, lp);
-                if (i > 0) v.setVisibility(View.GONE);   // at rest only what is playing shows
+                v.setVisibility(View.GONE);   // at rest only the time and your picture show
                 mods.add(v);
             }
             me = Cards.text(StageActivity.this, s, 24, R.font.outfit_medium, Color.WHITE);
@@ -1227,7 +1351,6 @@ public class StageActivity extends Activity {
             bar.addView(me, mlp);
             root.addView(bar, at(-2, d(64), Gravity.TOP | Gravity.END, 0, 60, 80, 0));
 
-            // The panel under it.
             card = new FrameLayout(StageActivity.this);
             GradientDrawable glass = new GradientDrawable();
             glass.setColor(0xD9383B42);
@@ -1239,7 +1362,7 @@ public class StageActivity extends Activity {
             card.setAlpha(0f);
             card.setVisibility(View.INVISIBLE);
             root.addView(card, at(d(W), d(552 + 2 * PAD), Gravity.TOP | Gravity.END, 0, 140, 80, 0));
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < views.length; i++) {
                 views[i] = new FrameLayout(StageActivity.this);
                 views[i].setClipChildren(false);
                 card.addView(views[i], new FrameLayout.LayoutParams(-1, -1));
@@ -1249,11 +1372,23 @@ public class StageActivity extends Activity {
                 views[CONTROLS].addView(k, at(d(AT[i][2]), d(AT[i][3]), Gravity.TOP | Gravity.START, AT[i][0], AT[i][1], 0, 0));
                 keys.add(k);
             }
+            // The time card: the weather is its background.
+            clockCard = new FrameLayout(StageActivity.this);
+            clockCard.setOutlineProvider(Cards.rounded(s, 34));
+            clockCard.setClipToOutline(true);
+            views[CLOCK].addView(clockCard, match());
+            // The timer card.
+            FrameLayout tm = new FrameLayout(StageActivity.this);
+            GradientDrawable tbg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFF4A5160, 0xFF262A33});
+            tbg.setCornerRadius(d(34));
+            tm.setBackground(tbg);
+            timerBig = cardWords(tm, "Timer", "", "", 130, false);
+            views[TIMER].addView(tm, match());
             refresh();
         }
 
         private FrameLayout key(int i) {
-            boolean big = i == 0, square = AT[i][2] < 200;
+            boolean big = i == WIFI;
             FrameLayout k = new FrameLayout(StageActivity.this);
             GradientDrawable bg = new GradientDrawable();
             bg.setColor(0x1FFFFFFF);
@@ -1262,89 +1397,175 @@ public class StageActivity extends Activity {
             k.setContentDescription(KEYS[i][0]);
             LinearLayout in = new LinearLayout(StageActivity.this);
             in.setOrientation(big ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-            in.setGravity(big || square ? Gravity.CENTER : Gravity.CENTER_VERTICAL);
-            in.setPadding(square ? 0 : d(22), 0, square ? 0 : d(16), 0);
-            ImageView icon = new ImageView(StageActivity.this);
-            icon.setImageResource(ICONS[i]);
-            int size = big ? 110 : square ? 46 : 42;
-            in.addView(icon, new LinearLayout.LayoutParams(d(size), d(size)));
-            if (!square) {
-                LinearLayout txt = new LinearLayout(StageActivity.this);
-                txt.setOrientation(LinearLayout.VERTICAL);
-                txt.setGravity(big ? Gravity.CENTER_HORIZONTAL : Gravity.START);
-                TextView a = Cards.text(StageActivity.this, s, big ? 29 : 27, R.font.outfit_medium, Color.WHITE);
-                a.setText(KEYS[i][0]);
-                txt.addView(a);
-                if (!KEYS[i][1].isEmpty()) {
-                    TextView b = Cards.text(StageActivity.this, s, 23, R.font.outfit_regular, 0xB3FFFFFF);
-                    b.setText(KEYS[i][1]);
-                    b.setTag("sub");
-                    txt.addView(b);
-                }
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-                if (big) lp.topMargin = d(20);
-                else lp.leftMargin = d(16);
-                in.addView(txt, lp);
+            in.setGravity(big ? Gravity.START | Gravity.BOTTOM : Gravity.CENTER_VERTICAL);
+            in.setPadding(d(26), big ? d(24) : 0, d(26), big ? d(24) : 0);
+            View icon;
+            if (big) {
+                wifiIcon = new WifiIcon(StageActivity.this);
+                icon = wifiIcon;
+            } else {
+                ImageView iv = new ImageView(StageActivity.this);
+                iv.setImageResource(ICONS[i]);
+                icon = iv;
+            }
+            int size = big ? 96 : 42;
+            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(d(size), d(size));
+            if (big) ilp.bottomMargin = d(26);
+            in.addView(icon, ilp);
+            LinearLayout txt = new LinearLayout(StageActivity.this);
+            txt.setOrientation(LinearLayout.VERTICAL);
+            TextView a = Cards.text(StageActivity.this, s, big ? 30 : 27, R.font.outfit_medium, Color.WHITE);
+            a.setText(KEYS[i][0]);
+            a.setSingleLine(true);
+            a.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            txt.addView(a);
+            TextView b = Cards.text(StageActivity.this, s, 23, R.font.outfit_regular, 0xB3FFFFFF);
+            b.setText(KEYS[i][1]);
+            b.setTag("sub");
+            b.setSingleLine(true);
+            txt.addView(b);
+            if (i == WIFI) {   // a long network name gets two lines
+                a.setSingleLine(false);
+                a.setMaxLines(2);
+                a.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, d(27));
+                wifiName = a;
+                wifiSub = b;
+            } else if (i == SPEAKERS) {
+                speakerSub = b;
+            }
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
+            if (!big) lp.leftMargin = d(18);
+            if (big) lp = new LinearLayout.LayoutParams(-1, -2);
+            in.addView(txt, lp);
+            if (i == VOLUME) {   // the level: a number, and a bar under the whole tile
+                volumeValue = Cards.text(StageActivity.this, s, 27, R.font.outfit_medium, Color.WHITE);
+                volumeValue.setFontFeatureSettings("tnum");
+                in.addView(volumeValue);
+                FrameLayout track = new FrameLayout(StageActivity.this);
+                GradientDrawable tr = new GradientDrawable();
+                tr.setColor(0x33FFFFFF);
+                tr.setCornerRadius(d(4));
+                track.setBackground(tr);
+                volumeFill = new View(StageActivity.this);
+                GradientDrawable fl = new GradientDrawable();
+                fl.setColor(Color.WHITE);
+                fl.setCornerRadius(d(4));
+                volumeFill.setBackground(fl);
+                volumeFill.setTag("fill");
+                track.addView(volumeFill, new FrameLayout.LayoutParams(0, -1));
+                k.addView(track, at(-1, d(8), Gravity.BOTTOM, 26, 0, 26, 16));
             }
             k.addView(in, match());
             return k;
         }
 
-        /** A module's card, filling the panel: what last played, the weather, or a running timer. */
+        /** Reads what changes: the Wi-Fi, where the sound goes, the volume, the weather. */
         void refresh() {
-            for (int i = 0; i < CONTROLS; i++) views[i].removeAllViews();
-            // What is playing: the music app that played most recently.
-            String best = null;
-            long when = 0;
-            for (String pkg : new String[]{"com.spotify.tv.android", "com.google.android.youtube.tvmusic", "com.google.android.youtube.tv"}) {
-                long t = NowPlaying.artTime(StageActivity.this, pkg);
-                if (t > when) {
-                    when = t;
-                    best = pkg;
+            // Wi-Fi: its name (with location access), its strength in words, and its link speed.
+            try {
+                WifiManager wm = getApplicationContext().getSystemService(WifiManager.class);
+                @SuppressWarnings("deprecation")
+                android.net.wifi.WifiInfo info = wm.getConnectionInfo();
+                ConnectivityManager cm = getSystemService(ConnectivityManager.class);
+                NetworkCapabilities caps = cm.getNetworkCapabilities(cm.getActiveNetwork());
+                if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                    wifiName.setText("Ethernet");
+                    wifiSub.setText("Connected by cable");
+                } else if (caps == null || !caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || info == null) {
+                    wifiName.setText("Wi-Fi");
+                    wifiSub.setText("Not connected");
+                } else {
+                    String ssid = info.getSSID();
+                    if (ssid == null || ssid.contains("unknown ssid")) ssid = "Wi-Fi";
+                    wifiName.setText(ssid.replace("\"", ""));
+                    int level = WifiManager.calculateSignalLevel(info.getRssi(), 4);
+                    String strength = new String[]{"Weak", "Fair", "Good", "Excellent"}[Math.max(0, Math.min(3, level))];
+                    int speed = info.getLinkSpeed();
+                    wifiSub.setText(speed > 0 ? strength + " · " + speed + " Mbps" : strength);
                 }
+            } catch (RuntimeException e) {
+                wifiName.setText("Wi-Fi");
+                wifiSub.setText("");
             }
-            FrameLayout mu = cardView(0xFF3A3326, 0xFF1C1810);
-            if (best != null) {
-                ImageView cover = new ImageView(StageActivity.this);
-                cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                cover.setOutlineProvider(Cards.rounded(s, 20));
-                cover.setClipToOutline(true);
-                cover.setElevation(d(16));
-                Bitmap art = NowPlaying.loadArt(StageActivity.this, best);
-                if (art != null) cover.setImageBitmap(art);
-                mu.addView(cover, at(d(300), d(300), Gravity.TOP | Gravity.START, 34, 76, 0, 0));
-                cardWords(mu, label(best), NowPlaying.loadTitle(StageActivity.this, best), "Press OK to open it", 40, true);
-            } else {
-                cardWords(mu, "Now playing", "Nothing yet", "Music from Spotify or YouTube Music shows here", 40, true);
+            wifiIcon.refresh();
+            // Where the sound goes.
+            String out = "TV speakers";
+            for (android.media.AudioDeviceInfo dev : audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+                int t = dev.getType();
+                if (t == android.media.AudioDeviceInfo.TYPE_HDMI_ARC || (Build.VERSION.SDK_INT >= 31 && t == android.media.AudioDeviceInfo.TYPE_HDMI_EARC)) {
+                    out = "Audio system";
+                    break;
+                }
+                if (t == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) out = "Bluetooth";
             }
-            views[0].addView(mu, match());
-            // The weather, from Home settings' city.
-            FrameLayout wx = cardView(0xFF3D7FC9, 0xFF142D55);
-            HeaderWeather.Reading r = new HeaderWeather(StageActivity.this, Prefs.weatherLatitude(StageActivity.this),
-                    Prefs.weatherLongitude(StageActivity.this)).cached();
-            if (r != null) {
-                ImageView ic = new ImageView(StageActivity.this);
-                ic.setImageResource(r.iconRes());
-                wx.addView(ic, at(d(150), d(150), Gravity.TOP | Gravity.END, 0, 34, 34, 0));
-                cardWords(wx, "Weather · " + Prefs.weatherPlace(StageActivity.this), r.temp + "°",
-                        r.words() + " · high " + r.high + "°, low " + r.low + "°", 130, false);
-            } else {
-                cardWords(wx, "Weather", "—", "Set your city in Home settings", 130, false);
-            }
-            views[1].addView(wx, match());
-            // A running timer, from the TV's timers app.
-            FrameLayout tm = cardView(0xFF4A5160, 0xFF262A33);
-            timerBig = cardWords(tm, "Timer", "", "", 130, false);
-            views[2].addView(tm, match());
+            speakerSub.setText(out);
+            showVolume();
+            showClock();
+            new HeaderWeather(StageActivity.this, Prefs.weatherLatitude(StageActivity.this), Prefs.weatherLongitude(StageActivity.this))
+                    .refresh(r -> showClock());
             tick();
         }
 
-        private String label(String pkg) {
-            try {
-                return getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(pkg, 0)).toString();
-            } catch (Exception e) {
-                return pkg;
+        private void showVolume() {
+            int v = audio.getStreamVolume(AudioManager.STREAM_MUSIC), max = Math.max(1, audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+            boolean muted = audio.isStreamMute(AudioManager.STREAM_MUSIC);
+            volumeValue.setText(muted ? "Muted" : String.valueOf(v));
+            View track = (View) volumeFill.getParent();
+            track.post(() -> {
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) volumeFill.getLayoutParams();
+                lp.width = muted ? 0 : Math.round(track.getWidth() * v / (float) max);
+                volumeFill.setLayoutParams(lp);
+            });
+        }
+
+        /** The time card: the time large, the day and date, and the weather, over a picture of the weather. */
+        private void showClock() {
+            clockCard.removeAllViews();
+            HeaderWeather.Reading r = new HeaderWeather(StageActivity.this, Prefs.weatherLatitude(StageActivity.this),
+                    Prefs.weatherLongitude(StageActivity.this)).cached();
+            clockCard.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR, sky(r)));
+            if (r != null) {
+                ImageView ic = new ImageView(StageActivity.this);
+                ic.setImageResource(r.iconRes());
+                ic.setAlpha(0.95f);
+                clockCard.addView(ic, at(d(190), d(190), Gravity.TOP | Gravity.END, 0, 26, 26, 0));
             }
+            boolean h24 = DateFormat.is24HourFormat(StageActivity.this);
+            Date now = new Date();
+            TextView small = Cards.text(StageActivity.this, s, 26, R.font.outfit_medium, 0xE6FFFFFF);
+            small.setText(DateFormat.format("EEEE", now));
+            clockCard.addView(small, at(-2, -2, Gravity.TOP | Gravity.START, 32, 30, 0, 0));
+            LinearLayout bottom = new LinearLayout(StageActivity.this);
+            bottom.setOrientation(LinearLayout.VERTICAL);
+            clockBig = Cards.text(StageActivity.this, s, 132, R.font.outfit_light, Color.WHITE);
+            clockBig.setFontFeatureSettings("tnum");
+            clockBig.setText(DateFormat.format(h24 ? "H:mm" : "h:mm", now));
+            clockDate = Cards.text(StageActivity.this, s, 30, R.font.outfit_medium, Color.WHITE);
+            clockDate.setText(DateFormat.format("d MMMM yyyy", now));
+            TextView wx = Cards.text(StageActivity.this, s, 26, R.font.outfit_regular, 0xD9FFFFFF);
+            String place = Prefs.weatherPlace(StageActivity.this);
+            wx.setText(r == null ? "Set your city in Home settings for the weather"
+                    : r.temp + "° · " + r.words() + " · H " + r.high + "°  L " + r.low + "°" + (place.isEmpty() ? "" : " · " + place));
+            bottom.addView(clockBig);
+            bottom.addView(clockDate);
+            LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(-2, -2);
+            wl.topMargin = d(8);
+            bottom.addView(wx, wl);
+            for (TextView t : new TextView[]{small, clockBig, clockDate, wx}) t.setShadowLayer(d(10), 0, d(1), 0x66000000);
+            clockCard.addView(bottom, at(-1, -2, Gravity.BOTTOM | Gravity.START, 32, 0, 24, 32));
+        }
+
+        /** The sky for a reading: sunny blue, a clear night's navy, cloud grey, rain slate, storm violet, snow pale. */
+        private int[] sky(HeaderWeather.Reading r) {
+            if (r == null) return new int[]{0xFF4A5160, 0xFF262A33};
+            int c = r.code;
+            if (c >= 95) return new int[]{0xFF4A4266, 0xFF17131F};                          // thunderstorm
+            if (c >= 71 && c <= 77 || c == 85 || c == 86) return new int[]{0xFFD3DEE9, 0xFF7E93A8};   // snow
+            if (c >= 51) return new int[]{0xFF56677D, 0xFF1F2B38};                          // drizzle, rain, showers
+            if (c == 45 || c == 48) return new int[]{0xFF9CA5AF, 0xFF5B636C};               // fog
+            if (!r.day) return c <= 1 ? new int[]{0xFF22305A, 0xFF0A1024} : new int[]{0xFF39425A, 0xFF141A2A};   // night
+            if (c <= 1) return new int[]{0xFF5DB4F2, 0xFF2667B8};                           // sunny
+            return new int[]{0xFF7E9BB8, 0xFF3F5671};                                       // cloudy
         }
 
         private FrameLayout cardView(int top, int bottom) {
@@ -1365,8 +1586,6 @@ public class StageActivity extends Activity {
             bottom.setOrientation(LinearLayout.VERTICAL);
             TextView b = Cards.text(StageActivity.this, s, bigSize, bold ? R.font.outfit_medium : R.font.outfit_light, Color.WHITE);
             b.setText(big);
-            b.setMaxLines(2);
-            b.setEllipsize(android.text.TextUtils.TruncateAt.END);
             b.setFontFeatureSettings("tnum");
             TextView u = Cards.text(StageActivity.this, s, 26, R.font.outfit_regular, 0xB8FFFFFF);
             u.setText(sub);
@@ -1379,7 +1598,13 @@ public class StageActivity extends Activity {
         }
 
         void time(String t) {
-            if (!t.contentEquals(clock.getText())) clock.setText(t);
+            if (!t.contentEquals(clock.getText())) {
+                clock.setText(t);
+                if (clockBig != null) {
+                    clockBig.setText(DateFormat.format(DateFormat.is24HourFormat(StageActivity.this) ? "H:mm" : "h:mm", new Date()));
+                    clockDate.setText(DateFormat.format("d MMMM yyyy", new Date()));
+                }
+            }
         }
 
         /** The timer shows in the bar only while one runs. */
@@ -1388,37 +1613,46 @@ public class StageActivity extends Activity {
         }
 
         void tick() {
-            if (timerBig == null) return;
-            if (shown && (mods.get(2).getVisibility() == View.VISIBLE) != timerOn()) {   // a timer started or ended
-                if (m == 2 && !timerOn()) {
+            String l = Clocks.line(StageActivity.this);
+            timerBig.setText(l != null && l.startsWith("Timer · ") ? l.substring(8) : "0:00");
+            TextView sub = (TextView) ((LinearLayout) timerBig.getParent()).getChildAt(1);
+            sub.setText(l != null && l.startsWith("Timer") ? "Press OK to open it" : "No timer running");
+            if (shown && (mods.get(TIMER).getVisibility() == View.VISIBLE) != timerOn()) {   // a timer started or ended
+                if (m == TIMER && !timerOn()) {
                     m = CONTROLS;
                     inBar = true;
                 }
                 StageActivity.this.paint(true);
             }
-            String l = Clocks.line(StageActivity.this);
-            timerBig.setText(l != null && l.startsWith("Timer · ") ? l.substring(8) : "0:00");
-            TextView sub = (TextView) ((LinearLayout) timerBig.getParent()).getChildAt(1);
-            sub.setText(l != null && l.startsWith("Timer") ? "Press OK to open it" : "No timer running");
+            if (shown && System.currentTimeMillis() / 1000 % 5 == 0) {   // the Wi-Fi and the volume, every few seconds
+                wifiIcon.refresh();
+                showVolume();
+            }
         }
 
         void open() {
             m = CONTROLS;
             inBar = false;
             q = 0;
+            refresh();
         }
 
-        /** Moves within the panel; false when the remote leaves it (it closes). */
+        /** Moves within the panel; Left and Right on Volume turn it instead. */
         boolean move(int dx, int dy) {
             if (inBar) {
-                if (dx > 0 && m < ME) m += m + 1 == 2 && !timerOn() ? 2 : 1;
-                else if (dx < 0 && m > 0) m -= m - 1 == 2 && !timerOn() ? 2 : 1;
+                if (dx > 0 && m < ME) m += m + 1 == TIMER && !timerOn() ? 2 : 1;
+                else if (dx < 0 && m > 0) m -= m - 1 == TIMER && !timerOn() ? 2 : 1;
                 else if (dy > 0 && m < ME) {
                     inBar = false;
                     q = 0;
                 } else return true;
             } else if (m != CONTROLS) {
                 if (dy < 0) inBar = true;
+            } else if (q == VOLUME && dx != 0) {
+                audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, dx > 0 ? AudioManager.ADJUST_RAISE : AudioManager.ADJUST_LOWER, 0);
+                showVolume();
+                main.postDelayed(this::showVolume, 400);   // an audio system answers a moment later
+                return true;
             } else {
                 int n = nextKey(q, dx, dy);
                 if (n >= 0) q = n;
@@ -1449,51 +1683,26 @@ public class StageActivity extends Activity {
         void press() {
             if (inBar) {
                 if (m == ME) startActivity(new Intent(StageActivity.this, SettingsActivity.class));   // your picture: Home settings
-                else if (m < CONTROLS) inBar = false;
+                else if (m < CONTROLS) inBar = false;   // into the time or timer card
                 StageActivity.this.paint(true);
                 return;
             }
-            if (m == 0) {
-                for (String pkg : new String[]{"com.spotify.tv.android", "com.google.android.youtube.tvmusic"}) {
-                    if (NowPlaying.artTime(StageActivity.this, pkg) > 0) {
-                        Intent l = getPackageManager().getLeanbackLaunchIntentForPackage(pkg);
-                        if (l != null) {
-                            startActivity(l.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                            return;
-                        }
-                    }
-                }
-                return;
-            }
-            if (m == 2) {
+            if (m == TIMER) {
                 Clocks.open(StageActivity.this);
                 return;
             }
-            if (m == 1) {
-                startActivity(new Intent(StageActivity.this, SettingsActivity.class));
+            if (m == CLOCK) return;   // the time card is to look at
+            if (q == VOLUME) {   // OK on Volume mutes, or brings the sound back
+                audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, 0);
+                main.postDelayed(this::showVolume, 300);
                 return;
             }
-            if (q == KEYS.length - 1) {
-                settings();
-                return;
-            }
-            // Sony's own Quick Settings strip, over the home screen; the panel steps back for it.
-            Intent sony = new Intent("com.sony.dtv.smartui.settings.intent.action.SHOW")
-                    .setClassName("com.sony.dtv.smartui", "com.sony.dtv.smartui.SmartUiReceiver");
-            if (getPackageManager().queryBroadcastReceivers(sony, 0).isEmpty()) {
-                settings();
-                return;
-            }
-            sendBroadcast(sony);
-            zone = Zone.TRAY;
-            StageActivity.this.paint(true);
-        }
-
-        private void settings() {
+            Intent i = new Intent(KEY_PAGES[q]).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (getPackageManager().resolveActivity(i, 0) == null) i = new Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             try {
-                startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            } catch (RuntimeException ignored) {
-                // no Settings app
+                startActivity(i);
+            } catch (RuntimeException e) {
+                // no such page on this TV
             }
         }
 
@@ -1503,7 +1712,8 @@ public class StageActivity extends Activity {
             if (on != shown) {
                 shown = on;
                 // The bar stretches out to the left; the panel unfolds from under its right end.
-                for (int i = 1; i < mods.size(); i++) mods.get(i).setVisibility(on && (i != 2 || timerOn()) ? View.VISIBLE : View.GONE);
+                mods.get(TIMER).setVisibility(on && timerOn() ? View.VISIBLE : View.GONE);
+                mods.get(CONTROLS).setVisibility(on ? View.VISIBLE : View.GONE);
                 ((GradientDrawable) bar.getBackground()).setColor(on ? 0x8C464A52 : 0x73282A30);
                 card.setPivotX(d(W) * 0.92f);
                 card.setPivotY(0);
@@ -1519,7 +1729,7 @@ public class StageActivity extends Activity {
                         View k = keys.get(i);
                         k.setAlpha(0f);
                         k.setTranslationY(-d(18));
-                        k.animate().alpha(1f).translationY(0).setStartDelay(animate ? 200 + 30L * i : 0).setDuration(ms)
+                        k.animate().alpha(1f).translationY(0).setStartDelay(animate ? 200 + 40L * i : 0).setDuration(ms)
                                 .setInterpolator(EASE).withEndAction(() -> k.animate().setStartDelay(0)).start();
                     }
                 } else {
@@ -1528,22 +1738,23 @@ public class StageActivity extends Activity {
                             .withEndAction(() -> card.setVisibility(View.INVISIBLE)).start();
                 }
             }
-            if (shown) mods.get(2).setVisibility(timerOn() ? View.VISIBLE : View.GONE);
-            for (int i = 0; i < 4; i++) views[i].setVisibility(i == Math.min(m, CONTROLS) ? View.VISIBLE : View.GONE);
+            if (shown) mods.get(TIMER).setVisibility(timerOn() ? View.VISIBLE : View.GONE);
+            for (int i = 0; i < views.length; i++) views[i].setVisibility(i == Math.min(m, CONTROLS) ? View.VISIBLE : View.GONE);
             for (int i = 0; i < mods.size(); i++) {
-                ImageView v = mods.get(i);
+                View v = mods.get(i);
                 boolean sel = on && i == m, lit = sel && inBar;
                 GradientDrawable bg = new GradientDrawable();
-                bg.setShape(GradientDrawable.OVAL);
+                bg.setCornerRadius(d(25));
                 bg.setColor(lit ? Color.WHITE : sel ? 0x38FFFFFF : 0x00000000);
                 v.setBackground(bg);
-                v.setImageTintList(ColorStateList.valueOf(lit ? 0xFF111111 : 0xD9FFFFFF));
-                v.animate().scaleX(lit ? 1.15f : 1f).scaleY(lit ? 1.15f : 1f).setDuration(300).setInterpolator(SPRING).start();
+                if (v instanceof ImageView) ((ImageView) v).setImageTintList(ColorStateList.valueOf(lit ? 0xFF111111 : 0xD9FFFFFF));
+                else ((TextView) v).setTextColor(lit ? 0xFF111111 : Color.WHITE);
+                v.animate().scaleX(lit ? 1.1f : 1f).scaleY(lit ? 1.1f : 1f).setDuration(300).setInterpolator(SPRING).start();
             }
             boolean meOn = on && inBar && m == ME;
             me.animate().scaleX(meOn ? 1.15f : 1f).scaleY(meOn ? 1.15f : 1f).setDuration(300).setInterpolator(SPRING).start();
             me.setForeground(meOn ? ring() : null);
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < CONTROLS; i++) {
                 View c = views[i].getChildCount() > 0 ? views[i].getChildAt(0) : null;
                 if (c == null) continue;
                 boolean cf = on && !inBar && m == i;
@@ -1556,15 +1767,20 @@ public class StageActivity extends Activity {
                 ((GradientDrawable) k.getBackground()).setColor(kf ? 0xF0FFFFFF : 0x1FFFFFFF);
                 tint(k, kf ? 0xFF111111 : Color.WHITE);
                 k.setElevation(kf ? d(16) : 0);
-                k.animate().scaleX(kf ? 1.07f : 1f).scaleY(kf ? 1.07f : 1f).setDuration(animate ? 350 : 0).setInterpolator(SPRING).start();
+                k.animate().scaleX(kf ? 1.05f : 1f).scaleY(kf ? 1.05f : 1f).setDuration(animate ? 350 : 0).setInterpolator(SPRING).start();
             }
         }
 
         private void tint(View v, int colour) {
-            if (v instanceof ImageView) ((ImageView) v).setImageTintList(ColorStateList.valueOf(colour));
+            if (v instanceof WifiIcon) ((WifiIcon) v).setColour(colour);
+            else if (v instanceof ImageView) ((ImageView) v).setImageTintList(ColorStateList.valueOf(colour));
             else if (v instanceof TextView) ((TextView) v).setTextColor("sub".equals(v.getTag()) ? (colour & 0x00FFFFFF) | 0xB3000000 : colour);
+            else if ("fill".equals(v.getTag())) ((GradientDrawable) v.getBackground()).setColor(colour);
             else if (v instanceof ViewGroup) {
                 ViewGroup g = (ViewGroup) v;
+                if (g.getBackground() instanceof GradientDrawable && g != v.getParent() && g.getChildCount() == 1 && "fill".equals(g.getChildAt(0).getTag())) {
+                    ((GradientDrawable) g.getBackground()).setColor(colour == Color.WHITE ? 0x33FFFFFF : 0x33000000);
+                }
                 for (int i = 0; i < g.getChildCount(); i++) tint(g.getChildAt(i), colour);
             }
         }

@@ -167,6 +167,7 @@ final class MusicScreen extends android.content.ContextWrapper {
         playing.registerCallback(callback);
         show(playing.getMetadata());
         keepAwake(true);
+        main.postDelayed(() -> { if (!partyOn) setPartyOn(true); }, 900);   // the music screen opens as a party
         return screen;
     }
 
@@ -533,6 +534,11 @@ final class MusicScreen extends android.content.ContextWrapper {
 
     /** Party mode: the disco lights fade in over the background and start listening to the music. */
     private void setPartyOn(boolean on) {
+        // The cover swells out past its place on the beat: nothing around it may cut it off.
+        for (android.view.ViewParent v = cover.getParent(); v instanceof android.view.ViewGroup; v = v.getParent()) {
+            ((android.view.ViewGroup) v).setClipChildren(false);
+            ((android.view.ViewGroup) v).setClipToPadding(false);
+        }
         if (on && lyricsOn) setLyricsShown(false);   // party mode is the cover alone
         partyOn = on;
         styleButtons();   // the ball's ring shows party mode is on

@@ -28,6 +28,8 @@ TV settings put system screen_off_timeout 120000
 # Android's 24-hour attentive timeout while music plays.
 TV cmd notification allow_listener "$PKG/$PKG.NowPlayingListener"
 TV pm grant "$PKG" android.permission.RECORD_AUDIO
+# The control panel shows the Wi-Fi network's name, which Android shares only with location access.
+TV pm grant "$PKG" android.permission.ACCESS_FINE_LOCATION
 TV pm grant "$PKG" android.permission.WRITE_SECURE_SETTINGS
 echo "Stage installed and set as the screensaver."
 # Settings can change the screensaver delay; All apps can show each app's size.

@@ -13,6 +13,10 @@
         tools:ignore="ProtectedPermissions" />
     <!-- The Wi-Fi button shows the signal strength. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Android shows the Wi-Fi network's name only to apps with location access; granted over adb. Nothing else
+         reads the location. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Party mode and the moving background hear what the TV plays, through Android's Visualizer. No microphone. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
