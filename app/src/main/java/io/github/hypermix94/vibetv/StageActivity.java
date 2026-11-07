@@ -50,6 +50,8 @@ public class StageActivity extends Activity {
     private static final int[] HIG = {260, 260, 260, 260, 260, 260, 260, 217, 184, 160};
     private static final int VISIBLE = 9, GAP = 40, TRAY_BOTTOM = 980, LEFT = 80;
     private static final float FOCUS_SCALE = 1.14f;
+    /** The "Not on Home" tile's stand-in package name: not a real app. */
+    private static final String LIBRARY = "stage.library";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private float s;
@@ -161,6 +163,11 @@ public class StageActivity extends Activity {
         }
         for (App a : all.values()) if (!hidden.contains(a.pkg)) others.add(a);
         while (unset && dock.size() < 6 && !others.isEmpty()) dock.add(others.remove(0));
+        // Apps taken off Home are one tile away: the last tile of the grid opens their list.
+        if (!hidden.isEmpty()) {
+            others.add(new App(LIBRARY, "Not on Home", new Intent(this, LibraryActivity.class),
+                    null, getDrawable(R.drawable.ic_apps_more)));
+        }
     }
 
     private void open(App a) {
@@ -204,6 +211,45 @@ public class StageActivity extends Activity {
             }
         }
         return votes >= 3 ? best : 0xFF1C1C20;
+    }
+
+    /**
+     * Where a plain banner's logo is, and the matrix that draws the banner so that logo is 78% of the tile's width
+     * (or 56% of its height, for tall logos), centred in the tile.
+     */
+    private static android.graphics.Matrix logoFit(Drawable banner, int tileW, int tileH) {
+        int w = 160, h = 90;
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Drawable copy = banner.getConstantState() != null ? banner.getConstantState().newDrawable().mutate() : banner;
+        copy.setBounds(0, 0, w, h);
+        copy.draw(new Canvas(b));
+        int bg = b.getPixel(0, 0), l = w, t = h, r = -1, bo = -1;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if (near(bg, b.getPixel(x, y))) continue;
+                l = Math.min(l, x);
+                r = Math.max(r, x);
+                t = Math.min(t, y);
+                bo = Math.max(bo, y);
+            }
+        }
+        b.recycle();
+        android.graphics.Matrix m = new android.graphics.Matrix();
+        int iw = Math.max(1, banner.getIntrinsicWidth()), ih = Math.max(1, banner.getIntrinsicHeight());
+        if (r < 0) {   // nothing found: the banner as a whole, fitted
+            float k = Math.min(tileW / (float) iw, tileH / (float) ih);
+            m.setScale(k, k);
+            m.postTranslate((tileW - iw * k) / 2f, (tileH - ih * k) / 2f);
+            return m;
+        }
+        float fw = (r - l + 1) / (float) w, fh = (bo - t + 1) / (float) h;   // the logo's share of the banner
+        float cx = (l + r + 1) / 2f / w, cy = (t + bo + 1) / 2f / h;          // and its middle
+        // How wide the whole banner must be drawn for its logo to be the target size.
+        float bw = Math.min(tileW * 0.78f / fw, tileH * 0.56f / fh * iw / ih);
+        float k = bw / iw;
+        m.setScale(k, k);
+        m.postTranslate(tileW / 2f - cx * iw * k, tileH / 2f - cy * ih * k);
+        return m;
     }
 
     /** True when every edge of a banner is one plain colour (Spotify's black, Netflix's white), not a gradient. */
@@ -362,10 +408,10 @@ public class StageActivity extends Activity {
         if (a.banner != null) {
             img.setImageDrawable(a.banner);
             if (plainEdges(a.banner)) {
-                // A banner on a plain colour: its logo gets room inside the tile, the tile's colour fills the margin.
-                img.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                int padX = Math.round(tw * 0.12f), padY = Math.round(th * 0.14f);
-                img.setPadding(d(padX), d(padY), d(padX), d(padY));
+                // A banner on a plain colour: every logo is scaled to the same optical size in its tile (whatever share
+                // of its banner it fills), centred, with the tile's colour around it.
+                img.setScaleType(ImageView.ScaleType.MATRIX);
+                img.setImageMatrix(logoFit(a.banner, d(tw), d(th)));
             } else {
                 img.setScaleType(ImageView.ScaleType.CENTER_CROP);   // a gradient banner fills the 5:3 tile, no bars
             }
@@ -940,7 +986,7 @@ public class StageActivity extends Activity {
 
     private void openMenu() {
         App a = focused();
-        if (a == null) return;
+        if (a == null || a.pkg.equals(LIBRARY)) return;
         boolean inTray = zone == Zone.TRAY;
         String remove = Apps.removeAction(this, a.pkg);
         String[] items = inTray
@@ -1048,6 +1094,7 @@ public class StageActivity extends Activity {
         shown.addAll(others);
         for (int i = 0; i < shown.size(); i++) {
             App a = shown.get(i);
+            if (a.pkg.equals(LIBRARY)) continue;
             if (getPackageManager().getLaunchIntentForPackage(a.pkg) != null
                     || getPackageManager().getLeanbackLaunchIntentForPackage(a.pkg) != null) continue;
             View t = i < dock.size() ? trayTiles.get(i) : gridTiles.get(i - dock.size());
