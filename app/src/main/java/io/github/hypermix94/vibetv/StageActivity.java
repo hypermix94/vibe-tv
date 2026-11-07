@@ -65,10 +65,6 @@ public class StageActivity extends Activity {
     private boolean stageIsCard;
     private View veil, chevron;
     private TextView title, line, gridName;
-    /** The line of the song being sung now, just above the tray, while the focused music app plays. */
-    private TextView lyric;
-    private Lyrics songLyrics = Lyrics.NONE;
-    private String songKey = "", playingPkg = "";
     /** A trending title's own logo, in place of its name in words. */
     private ImageView titleLogo;
     private LinearLayout words, dots;
@@ -149,7 +145,6 @@ public class StageActivity extends Activity {
     protected void onPause() {
         main.removeCallbacks(tick);
         main.removeCallbacks(nextSlide);
-        main.removeCallbacks(lyricTick);
         if (watched != null) {
             watched.unregisterCallback(songChanged);
             watched = null;
@@ -445,19 +440,6 @@ public class StageActivity extends Activity {
         gridName.setAlpha(0f);
         page.addView(gridName, at(d(tw + 120), -2, Gravity.TOP | Gravity.START, 0, 0, 0, 0));
 
-        lyric = Cards.text(this, s, 36, R.font.outfit_medium, Color.WHITE);
-        lyric.setTypeface(Cards.weight(this, R.font.outfit_medium, 700));   // bold, as the music screen's lyrics
-        lyric.setMaxLines(2);   // a long line wraps onto a second, never more
-        lyric.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        lyric.setLineSpacing(0, 1.05f);
-        lyric.setShadowLayer(d(14), 0, d(2), 0x99000000);
-        lyric.setAlpha(0f);
-        // Sits on a line just above the tray: one line or two, it grows upward, and ends well short of the cover.
-        FrameLayout lyricBox = new FrameLayout(this);
-        lyricBox.setClipChildren(false);
-        lyricBox.addView(lyric, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM | Gravity.START));
-        page.addView(lyricBox, at(d(860), d(110), Gravity.TOP | Gravity.START, LEFT, trayTop - 140, 0, 0));
-
         // Up: the small chevron says the control panel is there.
         chevron = new ImageView(this);
         ((ImageView) chevron).setImageResource(R.drawable.ic_chevron_up);
@@ -670,10 +652,8 @@ public class StageActivity extends Activity {
         }, "stage").start();
     }
 
-    /** The focused music app's song: its lyrics fetched once, then the line being sung shown above the tray. */
+    /** Listens to the focused music app's player: a new song, a pause or a play redraws the stage. */
     private void followSong(android.media.session.MediaController live) {
-        main.removeCallbacks(lyricTick);
-        // Listen to the player itself: a new song, a pause or a play redraws the stage (the name, the cover, the colour).
         if (watched != null && (live == null || watched != live)) {
             watched.unregisterCallback(songChanged);
             watched = null;
@@ -682,28 +662,6 @@ public class StageActivity extends Activity {
             watched = live;
             live.registerCallback(songChanged, main);
         }
-        if (live == null || live.getMetadata() == null) {
-            playingPkg = "";
-            lyric.animate().alpha(0f).setDuration(300).start();
-            return;
-        }
-        playingPkg = live.getPackageName();
-        android.media.MediaMetadata m = live.getMetadata();
-        String name = m.getString(android.media.MediaMetadata.METADATA_KEY_TITLE), who = m.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST);
-        String key = name + "/" + who;
-        if (!key.equals(songKey)) {
-            songKey = key;
-            songLyrics = Lyrics.NONE;
-            String album = m.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM);
-            long duration = m.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION);
-            new Thread(() -> {
-                Lyrics found = Lyrics.find(this, name, who, album, duration);
-                main.post(() -> {
-                    if (key.equals(songKey) && found != null) songLyrics = found;
-                });
-            }, "home-lyrics").start();
-        }
-        lyricTick.run();
     }
 
     private android.media.session.MediaController watched;
@@ -722,31 +680,6 @@ public class StageActivity extends Activity {
         public void onPlaybackStateChanged(android.media.session.PlaybackState state) {
             main.removeCallbacks(restage);
             main.postDelayed(restage, 400);   // "Playing now" or "Last played"
-        }
-    };
-
-    private final Runnable lyricTick = new Runnable() {
-        @Override
-        public void run() {
-            android.media.session.MediaController live = MusicScreen.playingMusic(StageActivity.this);
-            App a = focused();
-            boolean show = zone == Zone.TRAY && live != null && a != null && live.getPackageName().equals(a.pkg) && songLyrics.timed;
-            String text = "";
-            if (show) {
-                android.media.session.PlaybackState st = live.getPlaybackState();
-                long pos = st == null ? 0 : st.getPosition() + (long) ((android.os.SystemClock.elapsedRealtime() - st.getLastPositionUpdateTime()) * st.getPlaybackSpeed());
-                // In step with the song's own position, just early enough to cover the quick swap below.
-                for (Lyrics.Line l : songLyrics.lines) if (l.at <= pos + 150) text = l.text;
-            }
-            if (!text.contentEquals(lyric.getText())) {   // the next line rises in
-                String t = text;
-                lyric.animate().alpha(0f).translationY(-d(8)).setDuration(90).withEndAction(() -> {
-                    lyric.setText(t);
-                    lyric.setTranslationY(d(8));
-                    lyric.animate().alpha(t.isEmpty() ? 0f : 1f).translationY(0).setDuration(220).setInterpolator(EASE).start();
-                }).start();
-            }
-            if (live != null) main.postDelayed(this, 120);
         }
     };
 
