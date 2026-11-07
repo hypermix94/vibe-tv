@@ -1251,7 +1251,7 @@ public class StageActivity extends Activity {
         ControlPanel() {
             bar = new LinearLayout(StageActivity.this);
             bar.setGravity(Gravity.CENTER_VERTICAL);
-            bar.setPadding(d(12), 0, d(12), 0);   // room at both ends for a lit button and its ring
+            bar.setPadding(d(8), 0, d(8), 0);   // a lit button's ring may reach past the ends: nothing clips it
             bar.setClipChildren(false);
             bar.setClipToPadding(false);
             GradientDrawable pill = new GradientDrawable();
@@ -1268,7 +1268,7 @@ public class StageActivity extends Activity {
             clock = Cards.text(StageActivity.this, s, 26, R.font.outfit_regular, Color.WHITE);
             clock.setFontFeatureSettings("tnum");
             clock.setGravity(Gravity.CENTER);
-            clock.setPadding(d(18), 0, d(18), 0);
+            clock.setPadding(d(16), 0, d(12), 0);
             bar.addView(clock, new LinearLayout.LayoutParams(-2, d(50)));
             mods.add(clock);
             // Every button in the bar keeps a clear gap from the next, highlighted or not.
@@ -1277,7 +1277,7 @@ public class StageActivity extends Activity {
                 v.setImageResource(icon);
                 v.setPadding(d(11), d(11), d(11), d(11));
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(d(50), d(50));
-                lp.leftMargin = d(20);
+                lp.leftMargin = d(8);
                 bar.addView(v, lp);
                 v.setVisibility(View.GONE);   // at rest only the time and your picture show
                 mods.add(v);
@@ -1287,7 +1287,7 @@ public class StageActivity extends Activity {
             partyButton.setPadding(d(11), d(11), d(11), d(11));
             partyButton.setContentDescription("Party mode");
             LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(d(50), d(50));
-            plp.leftMargin = d(20);
+            plp.leftMargin = d(8);
             bar.addView(partyButton, plp);
             me = Cards.text(StageActivity.this, s, 24, R.font.outfit_medium, Color.WHITE);
             me.setGravity(Gravity.CENTER);
@@ -1297,7 +1297,7 @@ public class StageActivity extends Activity {
             av.setShape(GradientDrawable.OVAL);
             me.setBackground(av);
             LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(d(50), d(50));
-            mlp.leftMargin = d(22);
+            mlp.leftMargin = d(10);
             bar.addView(me, mlp);
             root.addView(bar, at(-2, d(70), Gravity.TOP | Gravity.END, 0, 57, 80, 0));
 
