@@ -63,7 +63,7 @@ public class StageActivity extends Activity {
     private int picOn;
     /** True while the stage shows a logo or an icon card (not a full picture): the grid hides it, keeping the glow. */
     private boolean stageIsCard;
-    private View veil, chevron;
+    private View veil;
     private TextView title, line, gridName;
     /** A trending title's own logo, in place of its name in words. */
     private ImageView titleLogo;
@@ -440,11 +440,6 @@ public class StageActivity extends Activity {
         gridName.setAlpha(0f);
         page.addView(gridName, at(d(tw + 120), -2, Gravity.TOP | Gravity.START, 0, 0, 0, 0));
 
-        // Up: the small chevron says the control panel is there.
-        chevron = new ImageView(this);
-        ((ImageView) chevron).setImageResource(R.drawable.ic_chevron_up);
-        chevron.setAlpha(0.85f);
-        root.addView(chevron, at(d(44), d(44), Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 16, 0, 0));
 
         panel = new ControlPanel();
         return root;
@@ -1027,7 +1022,6 @@ public class StageActivity extends Activity {
         gridName.animate().alpha(inGrid ? 1f : 0f).setDuration(animate ? 300 : 0).start();
         words.animate().alpha(zone == Zone.TRAY ? 1f : 0f).setDuration(animate ? 400 : 0).start();
         dots.animate().alpha(zone == Zone.TRAY ? 1f : 0f).setDuration(animate ? 400 : 0).start();
-        chevron.animate().alpha(zone == Zone.TRAY ? 0.85f : 0f).setDuration(animate ? 400 : 0).start();
         // In the grid a logo or icon card would blur into a smudge under the tiles: only its glow stays.
         pics[picOn].animate().alpha(inGrid && stageIsCard ? 0f : 1f).setDuration(animate ? 400 : 0).start();
         View stage = (View) pics[0].getParent();
