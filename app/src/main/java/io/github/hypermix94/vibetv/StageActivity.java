@@ -499,12 +499,15 @@ public class StageActivity extends Activity {
     }
 
     private final Runnable stageNow = () -> stage(true);
-    /** Which trending title shows for the focused app; the next one comes every fifteen seconds. */
+    /**
+     * Which trending title shows: every app's titles run on one clock, a new one every fifteen seconds whether the app
+     * is focused or not, so coming back to an app shows where it has got to, not its first title again.
+     */
+    private static final long SLIDE_MS = 15_000;
     private int slide;
     private String slidePkg = "";
     private final Runnable nextSlide = () -> {
         if (zone != Zone.TRAY || !hasWindowFocus()) return;
-        slide++;
         stage(true);
     };
 
@@ -516,10 +519,8 @@ public class StageActivity extends Activity {
     private void stage(boolean animate) {
         App a = focused();
         if (a == null) return;
-        if (!a.pkg.equals(slidePkg)) {
-            slidePkg = a.pkg;
-            slide = 0;
-        }
+        slidePkg = a.pkg;
+        slide = (int) (System.currentTimeMillis() / SLIDE_MS);
         android.media.session.MediaController player = MusicScreen.playingMusic(this);
         String song = player != null && player.getPackageName().equals(a.pkg) && player.getMetadata() != null
                 ? player.getMetadata().getString(android.media.MediaMetadata.METADATA_KEY_TITLE) : "";
@@ -631,7 +632,7 @@ public class StageActivity extends Activity {
                         : said.isEmpty() ? lastOpened(a.pkg) : "Last played " + android.text.TextUtils.htmlEncode(said);
                 line.setText(android.text.Html.fromHtml(bigName ? what
                         : "<b>" + android.text.TextUtils.htmlEncode(a.label) + "</b> · " + what, android.text.Html.FROM_HTML_MODE_LEGACY));
-                if (hot.size() > 1) main.postDelayed(nextSlide, 15_000);
+                if (hot.size() > 1) main.postDelayed(nextSlide, SLIDE_MS - System.currentTimeMillis() % SLIDE_MS + 50);   // the clock's next tick
                 followSong(playingNow ? live : null);
                 dots.removeAllViews();
                 for (int i = 0; item != null && hot.size() > 1 && i < hot.size(); i++) {
