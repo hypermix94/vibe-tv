@@ -49,6 +49,37 @@ final class Trending {
         PROVIDERS.put("com.suntv.sunnxt", "309");
     }
 
+    /** Each app's service on TMDB, for its official logo (a clear PNG, kept for good once fetched). */
+    private static final Map<String, Integer> NETWORKS = new HashMap<>();
+
+    static {
+        NETWORKS.put("com.netflix.ninja", 213);
+        NETWORKS.put("com.amazon.amazonvideo.livingroom", 1024);
+        NETWORKS.put("in.startv.hotstar", 3919);
+        NETWORKS.put("com.graymatrix.did", 2590);
+        NETWORKS.put("com.google.android.youtube.tv", 247);
+    }
+
+    /** The service's official logo for an app, from TMDB, or null; call off the main thread. */
+    static Bitmap serviceLogo(Context c, String pkg) {
+        Integer id = NETWORKS.get(pkg);
+        if (id == null || !enabled(c)) return null;
+        File f = new File(c.getFilesDir(), "service-logo-" + id + ".png");
+        if (!f.exists()) {
+            try {
+                JSONArray logos = new JSONObject(get(c, "https://api.themoviedb.org/3/network/" + id + "/images?api_key="
+                        + c.getString(R.string.tmdb_key))).getJSONArray("logos");
+                byte[] img = bytes("https://image.tmdb.org/t/p/w500" + logos.getJSONObject(0).getString("file_path"));
+                try (FileOutputStream out = new FileOutputStream(f)) {
+                    out.write(img);
+                }
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return BitmapFactory.decodeFile(f.getAbsolutePath());
+    }
+
     private static final long KEEP_MS = 6 * 3600_000L, RETRY_MS = 15 * 60_000L;
     private static final int MAX = 8;
 

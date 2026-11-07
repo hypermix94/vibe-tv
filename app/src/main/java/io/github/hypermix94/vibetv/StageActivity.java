@@ -57,6 +57,8 @@ public class StageActivity extends Activity {
     private final ImageView[] pics = new ImageView[2];
     private final ImageView[] fills = new ImageView[2];
     private int picOn;
+    /** True while the stage shows a logo or an icon card (not a full picture): the grid hides it, keeping the glow. */
+    private boolean stageIsCard;
     private View veil, chevron;
     private TextView title, line, gridName;
     /** A trending title's own logo, in place of its name in words. */
@@ -242,6 +244,53 @@ public class StageActivity extends Activity {
         m.setScale(k, k);
         m.postTranslate(tileW / 2f - cx * iw * k, tileH / 2f - cy * ih * k);
         return m;
+    }
+
+    /** An app's icon drawn at 512 px from the sharpest copy it ships (TV icons are often small at the TV's density). */
+    private Bitmap hiResIcon(App a) {
+        Drawable icon = a.icon;
+        try {
+            android.content.pm.ApplicationInfo ai = getPackageManager().getApplicationInfo(a.pkg, 0);
+            if (ai.icon != 0) {
+                Drawable big = getPackageManager().getResourcesForApplication(ai)
+                        .getDrawableForDensity(ai.icon, android.util.DisplayMetrics.DENSITY_XXXHIGH, null);
+                if (big != null) icon = big;
+            }
+        } catch (Exception ignored) {
+            // the icon as listed
+        }
+        Bitmap b = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        if (icon instanceof android.graphics.drawable.AdaptiveIconDrawable) {   // its own background, full bleed
+            android.graphics.drawable.AdaptiveIconDrawable ad = (android.graphics.drawable.AdaptiveIconDrawable) icon;
+            int bleed = 512 / 6;   // the adaptive icon's outer 1/6 on each side is safe-zone overscan
+            for (Drawable layer : new Drawable[]{ad.getBackground(), ad.getForeground()}) {
+                if (layer == null) continue;
+                layer.setBounds(-bleed, -bleed, 512 + bleed, 512 + bleed);
+                layer.draw(c);
+            }
+        } else {
+            c.drawColor(colourOf(a));
+            icon.setBounds(64, 64, 448, 448);
+            icon.draw(c);
+        }
+        return b;
+    }
+
+    /** Dark grey lettering in a logo made for white backgrounds turns white, for the dark stage; colour stays. */
+    private static Bitmap whiten(Bitmap src) {
+        Bitmap b = src.copy(Bitmap.Config.ARGB_8888, true);
+        int w = b.getWidth(), h = b.getHeight();
+        int[] px = new int[w * h];
+        b.getPixels(px, 0, w, 0, 0, w, h);
+        float[] hsv = new float[3];
+        for (int i = 0; i < px.length; i++) {
+            if (Color.alpha(px[i]) == 0) continue;
+            Color.colorToHSV(px[i], hsv);
+            if (hsv[1] < 0.25f && hsv[2] < 0.45f) px[i] = (px[i] & 0xFF000000) | 0x00FFFFFF;
+        }
+        b.setPixels(px, 0, w, 0, 0, w, h);
+        return b;
     }
 
     /** True when every edge of a banner is one plain colour (Spotify's black, Netflix's white), not a gradient. */
@@ -478,12 +527,15 @@ public class StageActivity extends Activity {
             boolean square = pic == null && art != null && art.getWidth() < art.getHeight() * 1.3f;
             int albumColour = square ? MusicScreen.primary(art) : 0;
             Bitmap coverCard = square ? card(art, d(560), d(18), d(48)) : null;
+            // The app's logo: yours (local-logos) first, else the service's own from TMDB, crisp at any size.
             Bitmap own = ownLogo(a.pkg);
-            Bitmap logo = own != null ? trim(unmatte(own)) : null;
-            int logoGlow = glowColour(own, null);   // a white logo has no colour of its own: then the banner's
+            Bitmap service = own == null && art == null ? Trending.serviceLogo(this, a.pkg) : null;
+            Bitmap logo = own != null ? trim(unmatte(own)) : service != null ? whiten(trim(service)) : null;
+            int logoGlow = glowColour(own != null ? own : service, null);   // a white logo: the banner's colour instead
             int glow = logoGlow != NO_GLOW ? logoGlow : glowColour(null, a.banner != null ? a.banner : a.icon);
-            boolean light = logo == null && a.banner != null && luminance(colourOf(a)) > 0.7f;
-            Bitmap mark = logo != null || a.banner == null ? null : light ? trim(cutOut(a.banner, colourOf(a))) : feather(a.banner);
+            boolean light = a.banner != null && luminance(colourOf(a)) > 0.7f;
+            // Any other app: its own icon at the highest resolution it ships, as a rounded card.
+            Bitmap iconCard = logo == null && art == null ? card(hiResIcon(a), d(300), d(66), d(48)) : null;
             main.post(() -> {
                 if (!key.equals(stageKey) || isDestroyed()) return;
                 int next = 1 - picOn;
@@ -502,14 +554,10 @@ public class StageActivity extends Activity {
                     p.setPadding(d(960 - w / 2), d(525 - h / 2), d(960 - w / 2), d(1080 - 525 - h / 2));
                     f.setBackground(glow(glow));
                 } else if (plain) {
-                    // Any other app: its own logo in the middle of the whole screen, over its colours blurred. A banner
-                    // on white gives up its white (the logo alone, on a glow of its colour); others fade at the edges.
-                    if (mark != null) p.setImageBitmap(mark);
-                    else p.setImageDrawable(a.icon);
-                    p.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    float w = mark != null ? Math.min(light ? 560 : 640, mark.getWidth() * (light ? 1f : 1f)) : 240;
-                    float h = mark != null ? w * mark.getHeight() / mark.getWidth() : 240;
-                    p.setPadding(d(960 - w / 2), d(540 - h / 2), d(960 - w / 2), d(540 - h / 2));
+                    // Any other app: its icon card in the middle of the whole screen, over its colours blurred.
+                    p.setImageBitmap(iconCard);
+                    p.setScaleType(ImageView.ScaleType.CENTER);
+                    p.setPadding(0, 0, 0, 0);
                     if (a.banner != null && !light && Build.VERSION.SDK_INT >= 31) {
                         f.setBackgroundColor(colourOf(a));
                         f.setImageDrawable(a.banner.getConstantState() != null ? a.banner.getConstantState().newDrawable() : a.banner);
@@ -539,7 +587,8 @@ public class StageActivity extends Activity {
                     p.setTranslationY(d(70));
                     p.animate().translationY(0).setDuration(750).setInterpolator(new OvershootInterpolator(1.8f)).start();
                 }
-                p.animate().alpha(1f).setDuration(ms).setInterpolator(EASE).start();
+                stageIsCard = plain;
+                p.animate().alpha(zone == Zone.GRID && plain ? 0f : 1f).setDuration(ms).setInterpolator(EASE).start();
                 f.animate().alpha(1f).setDuration(ms).start();
                 pics[picOn].animate().alpha(0f).setDuration(ms).start();
                 fills[picOn].animate().alpha(0f).setDuration(ms).start();
@@ -919,6 +968,8 @@ public class StageActivity extends Activity {
         words.animate().alpha(zone == Zone.TRAY ? 1f : 0f).setDuration(animate ? 400 : 0).start();
         dots.animate().alpha(zone == Zone.TRAY ? 1f : 0f).setDuration(animate ? 400 : 0).start();
         chevron.animate().alpha(zone == Zone.TRAY ? 0.85f : 0f).setDuration(animate ? 400 : 0).start();
+        // In the grid a logo or icon card would blur into a smudge under the tiles: only its glow stays.
+        pics[picOn].animate().alpha(inGrid && stageIsCard ? 0f : 1f).setDuration(animate ? 400 : 0).start();
         View stage = (View) pics[0].getParent();
         stage.animate().scaleX(inGrid ? 1.08f : 1f).scaleY(inGrid ? 1.08f : 1f).alpha(inGrid ? 0.5f : 1f)
                 .setDuration(animate ? 900 : 0).setInterpolator(EASE).start();
