@@ -446,11 +446,12 @@ public class StageActivity extends Activity {
         page.addView(gridName, at(d(tw + 120), -2, Gravity.TOP | Gravity.START, 0, 0, 0, 0));
 
         lyric = Cards.text(this, s, 36, R.font.outfit_medium, Color.WHITE);
+        lyric.setTypeface(Cards.weight(this, R.font.outfit_medium, 700));   // bold, as the music screen's lyrics
         lyric.setSingleLine(true);
         lyric.setEllipsize(android.text.TextUtils.TruncateAt.END);
         lyric.setShadowLayer(d(14), 0, d(2), 0x99000000);
         lyric.setAlpha(0f);
-        page.addView(lyric, at(d(1100), -2, Gravity.TOP | Gravity.START, LEFT, trayTop - 84, 0, 0));
+        page.addView(lyric, at(d(860), -2, Gravity.TOP | Gravity.START, LEFT, trayTop - 84, 0, 0));   // ends well short of the cover
 
         // Up: the small chevron says the control panel is there.
         chevron = new ImageView(this);
