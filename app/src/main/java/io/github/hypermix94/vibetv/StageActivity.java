@@ -324,8 +324,9 @@ public class StageActivity extends Activity {
         t.setOutlineProvider(Cards.rounded(s, 20));
         t.setClipToOutline(true);
         if (Build.VERSION.SDK_INT >= 28) {   // focus glows in the app's own colour
-            t.setOutlineSpotShadowColor(lighter(col));
-            t.setOutlineAmbientShadowColor(lighter(col));
+            int shadow = luminance(col) > 0.6f ? Color.BLACK : lighter(col);   // a white tile casts a shadow, not a haze
+            t.setOutlineSpotShadowColor(shadow);
+            t.setOutlineAmbientShadowColor(Color.BLACK);
         }
         ImageView img = new ImageView(this);
         if (a.banner != null) {
@@ -396,9 +397,12 @@ public class StageActivity extends Activity {
                 }, "trending").start();
             }
             Bitmap art = pic != null ? pic : NowPlaying.loadArt(this, a.pkg);
-            Bitmap logo = art == null ? ownLogo(a.pkg) : null;
-            boolean light = art == null && a.banner != null && luminance(colourOf(a)) > 0.7f;
-            Bitmap mark = light ? cutOut(a.banner, colourOf(a)) : art == null && a.banner != null ? feather(a.banner) : null;
+            Bitmap own = ownLogo(a.pkg);
+            Bitmap logo = own != null ? trim(unmatte(own)) : null;
+            int logoGlow = glowColour(own, null);   // a white logo has no colour of its own: then the banner's
+            int glow = logoGlow != NO_GLOW ? logoGlow : glowColour(null, a.banner != null ? a.banner : a.icon);
+            boolean light = logo == null && a.banner != null && luminance(colourOf(a)) > 0.7f;
+            Bitmap mark = logo != null || a.banner == null ? null : light ? trim(cutOut(a.banner, colourOf(a))) : feather(a.banner);
             main.post(() -> {
                 if (!key.equals(stageKey) || isDestroyed()) return;
                 int next = 1 - picOn;
@@ -408,42 +412,46 @@ public class StageActivity extends Activity {
                 f.setColorFilter(null);
                 if (Build.VERSION.SDK_INT >= 31) f.setRenderEffect(null);
                 boolean plain = art == null;
-                if (plain && logo != null) {   // your own logo for the app, on black, never past its own size
+                if (plain && logo != null) {
+                    // Your logo: centred between the name (its line ends near 280) and the tray (from 770), on a soft
+                    // glow in the app's own colour, never larger than the picture itself.
                     p.setImageBitmap(logo);
                     p.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    // Centred across the screen, and between the name's line (ends near 280) and the tray (starts near 770).
                     float w = Math.min(720, logo.getWidth() / s), h = w * logo.getHeight() / logo.getWidth();
                     p.setPadding(d(960 - w / 2), d(525 - h / 2), d(960 - w / 2), d(1080 - 525 - h / 2));
-                    f.setBackgroundColor(Color.BLACK);
-                } else if (!plain && art.getWidth() < art.getHeight() * 1.3f) {
+                    f.setBackground(glow(glow));
+                } else if (plain) {
+                    // Any other app: its own logo in the middle of the whole screen, over its colours blurred. A banner
+                    // on white gives up its white (the logo alone, on a glow of its colour); others fade at the edges.
+                    if (mark != null) p.setImageBitmap(mark);
+                    else p.setImageDrawable(a.icon);
+                    p.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    float w = mark != null ? Math.min(light ? 560 : 640, mark.getWidth() * (light ? 1f : 1f)) : 240;
+                    float h = mark != null ? w * mark.getHeight() / mark.getWidth() : 240;
+                    p.setPadding(d(960 - w / 2), d(540 - h / 2), d(960 - w / 2), d(540 - h / 2));
+                    if (a.banner != null && !light && Build.VERSION.SDK_INT >= 31) {
+                        f.setBackgroundColor(colourOf(a));
+                        f.setImageDrawable(a.banner.getConstantState() != null ? a.banner.getConstantState().newDrawable() : a.banner);
+                        f.setColorFilter(0x59000000, android.graphics.PorterDuff.Mode.SRC_ATOP);
+                        f.setRenderEffect(RenderEffect.createBlurEffect(d(90), d(90), Shader.TileMode.CLAMP));
+                    } else {
+                        f.setBackground(glow(glow));
+                    }
+                } else if (art.getWidth() < art.getHeight() * 1.3f) {
                     // A square cover: large on the right, over itself spread and softened across the screen.
                     p.setImageBitmap(art);
                     p.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     p.setPadding(d(1240), d(150), d(80), d(1080 - 150 - 600));   // between the time pill and the tray, flush with the tray's right
                     p.setClipToOutline(false);
                     f.setBackgroundColor(Color.BLACK);
-                    f.setImageBitmap(art);
+                    f.setImageBitmap(art);   // the cover, spread and softened behind itself
                     f.setColorFilter(0x8C000000, android.graphics.PorterDuff.Mode.SRC_ATOP);
                     if (Build.VERSION.SDK_INT >= 31) f.setRenderEffect(RenderEffect.createBlurEffect(d(80), d(80), Shader.TileMode.CLAMP));
-                } else if (!plain) {
+                } else {
                     p.setImageBitmap(art);
                     p.setScaleType(ImageView.ScaleType.CENTER_CROP);
                     p.setPadding(0, 0, 0, 0);
                     f.setBackgroundColor(Color.BLACK);
-                } else {
-                    if (mark != null) p.setImageBitmap(mark);
-                    else p.setImageDrawable(a.banner != null ? a.banner : a.icon);
-                    p.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    // The banner large but not past twice its size, centred above the tray; the icon smaller.
-                    int w = a.banner != null ? 640 : 240, h = Math.round(w * (a.banner != null ? 0.5625f : 1f));
-                    int cx = 960, cy = 525;
-                    p.setPadding(d(cx - w / 2f), d(cy - h / 2f), d(1920 - cx - w / 2f), d(1080 - cy - h / 2f));
-                    f.setBackgroundColor(a.banner != null && !light ? colourOf(a) : 0xFF0E0E10);
-                    if (a.banner != null && !light && Build.VERSION.SDK_INT >= 31) {
-                        f.setImageDrawable(a.banner.getConstantState() != null ? a.banner.getConstantState().newDrawable() : a.banner);
-                        f.setColorFilter(0x59000000, android.graphics.PorterDuff.Mode.SRC_ATOP);
-                        f.setRenderEffect(RenderEffect.createBlurEffect(d(90), d(90), Shader.TileMode.CLAMP));
-                    }
                 }
                 long ms = animate ? 600 : 0;
                 p.animate().alpha(1f).setDuration(ms).start();
@@ -455,7 +463,7 @@ public class StageActivity extends Activity {
                 // The name, large at the top left for every app, as on Apple TV; the line under it says what is on.
                 boolean bigName = true;
                 title.setText(item != null ? item.title : a.label);
-                title.setVisibility(bigName ? View.VISIBLE : View.GONE);
+                title.setVisibility(View.VISIBLE);
                 String what = item != null ? "Trending on " + android.text.TextUtils.htmlEncode(a.label) + " · from TMDB"
                         : said.isEmpty() ? lastOpened(a.pkg) : "Last played " + android.text.TextUtils.htmlEncode(said);
                 line.setText(android.text.Html.fromHtml(bigName ? what
@@ -521,6 +529,90 @@ public class StageActivity extends Activity {
         }
         b.setPixels(px, 0, w, 0, 0, w, h);
         return b;
+    }
+
+    /**
+     * A logo on a plain dark background with the background taken away: each pixel keeps as much of itself as differs
+     * from the background, so soft edges stay soft and the box around it is gone (JPEG logos are rarely pure black).
+     */
+    private static Bitmap unmatte(Bitmap src) {
+        int w = src.getWidth(), h = src.getHeight();
+        int[] px = new int[w * h];
+        src.getPixels(px, 0, w, 0, 0, w, h);
+        int bg = px[0];
+        for (int i = 0; i < px.length; i++) {
+            int c = px[i];
+            int dr = Color.red(c) - Color.red(bg), dg = Color.green(c) - Color.green(bg), db = Color.blue(c) - Color.blue(bg);
+            float a = Math.min(1f, Math.max(0f, (Math.max(Math.abs(dr), Math.max(Math.abs(dg), Math.abs(db))) - 12) / 90f));
+            if (a <= 0f) {
+                px[i] = 0;
+                continue;
+            }
+            int r = clamp(Color.red(bg) + Math.round(dr / a)), g = clamp(Color.green(bg) + Math.round(dg / a)), b = clamp(Color.blue(bg) + Math.round(db / a));
+            px[i] = Color.argb(Math.round(a * 255), r, g, b);
+        }
+        return Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888);
+    }
+
+    private static int clamp(int v) {
+        return Math.max(0, Math.min(255, v));
+    }
+
+    /** The picture cut to what it actually draws: no clear margins, so it lines up with the words under it. */
+    private static Bitmap trim(Bitmap b) {
+        int w = b.getWidth(), h = b.getHeight(), l = w, t = h, r = -1, bo = -1;
+        int[] px = new int[w * h];
+        b.getPixels(px, 0, w, 0, 0, w, h);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if (Color.alpha(px[y * w + x]) < 24) continue;
+                l = Math.min(l, x);
+                r = Math.max(r, x);
+                t = Math.min(t, y);
+                bo = Math.max(bo, y);
+            }
+        }
+        return r < 0 ? b : Bitmap.createBitmap(b, l, t, r - l + 1, bo - t + 1);
+    }
+
+    private static final int NO_GLOW = 0xFF3A3A44;
+
+    /** The app's colour for its glow: the average of its logo's (or banner's) vivid pixels, else a quiet grey. */
+    private static int glowColour(Bitmap logo, Drawable banner) {
+        Bitmap b = logo;
+        if (b == null && banner != null) {
+            b = Bitmap.createBitmap(64, 36, Bitmap.Config.ARGB_8888);
+            Drawable copy = banner.getConstantState() != null ? banner.getConstantState().newDrawable().mutate() : banner;
+            copy.setBounds(0, 0, 64, 36);
+            copy.draw(new Canvas(b));
+        }
+        if (b == null) return NO_GLOW;
+        Bitmap small = Bitmap.createScaledBitmap(b, 64, Math.max(1, 64 * b.getHeight() / b.getWidth()), true);
+        long r = 0, g = 0, bl = 0, n = 0;
+        float[] hsv = new float[3];
+        for (int y = 0; y < small.getHeight(); y++) {
+            for (int x = 0; x < small.getWidth(); x++) {
+                int c = small.getPixel(x, y);
+                Color.colorToHSV(c, hsv);
+                if (Color.alpha(c) < 200 || hsv[1] < 0.4f || hsv[2] < 0.3f) continue;
+                r += Color.red(c);
+                g += Color.green(c);
+                bl += Color.blue(c);
+                n++;
+            }
+        }
+        if (n < 8) return NO_GLOW;
+        return Color.rgb((int) (r / n), (int) (g / n), (int) (bl / n));
+    }
+
+    /** A dark stage lit softly from the right in {@code colour}, like light from off screen. */
+    private Drawable glow(int colour) {
+        GradientDrawable light = new GradientDrawable();
+        light.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        light.setGradientCenter(0.7f, 0.38f);
+        light.setGradientRadius(d(1150));
+        light.setColors(new int[]{(colour & 0x00FFFFFF) | 0x8C000000, (colour & 0x00FFFFFF) | 0x26000000, 0x00000000});
+        return new android.graphics.drawable.LayerDrawable(new Drawable[]{new android.graphics.drawable.ColorDrawable(0xFF0B0B0D), light});
     }
 
     /** Your own logo for an app, from local-logos (see app/build.gradle), or null. */
