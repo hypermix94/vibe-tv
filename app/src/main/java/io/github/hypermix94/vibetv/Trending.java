@@ -98,7 +98,7 @@ final class Trending {
     }
 
     private static SharedPreferences prefs(Context c) {
-        return c.getSharedPreferences("trending4", Context.MODE_PRIVATE);
+        return c.getSharedPreferences("trending5", Context.MODE_PRIVATE);
     }
 
     /** The last list for an app, whose pictures are on disk; empty before the first answer. */
@@ -145,7 +145,8 @@ final class Trending {
                 JSONArray a = r.getJSONArray("results");
                 for (int i = 0; i < a.length(); i++) {
                     JSONObject o = a.getJSONObject(i);
-                    if (!o.optString("backdrop_path").isEmpty()) found.add(o.put("kind", kind));
+                    // TMDB sends null for a title with no picture, which optString reads as the word "null"
+                    if (!o.isNull("backdrop_path") && !o.optString("backdrop_path").isEmpty()) found.add(o.put("kind", kind));
                 }
             }
             found.sort((x, y) -> Double.compare(y.optDouble("popularity"), x.optDouble("popularity")));
@@ -171,15 +172,22 @@ final class Trending {
                 File f = new File(dir, path.replaceAll("[^A-Za-z0-9.]", ""));
                 if (f.exists()) f.setLastModified(now);   // still trending: keep it
                 else {
-                    byte[] img = bytes("https://image.tmdb.org/t/p/w1280" + path);
-                    try (FileOutputStream out = new FileOutputStream(f)) {
-                        out.write(img);
+                    try {
+                        byte[] img = bytes("https://image.tmdb.org/t/p/w1280" + path);
+                        try (FileOutputStream out = new FileOutputStream(f)) {
+                            out.write(img);
+                        }
+                    } catch (Exception e) {
+                        continue;   // one picture that will not come: skip that title, keep the rest
                     }
                 }
                 String title = o.has("name") ? o.getString("name") : o.optString("title");
                 keep.put(new JSONObject().put("t", title).put("p", f.getAbsolutePath()).put("l", titleLogo(c, dir, o)));
             }
-            if (keep.length() == 0) return false;
+            if (keep.length() == 0) {
+                android.util.Log.w("Stage", "trending for " + pkg + ": nothing found (" + found.size() + " candidates)");
+                return false;
+            }
             p.edit().putString(pkg, keep.toString()).putBoolean("ok_" + pkg, true).apply();
             // Pictures of titles that have dropped out: gone after three days, so the cache never keeps growing
             // (every list refreshes well within that, and a picture still in use is touched again when kept).
@@ -189,6 +197,7 @@ final class Trending {
             }
             return true;
         } catch (Exception e) {
+            android.util.Log.w("Stage", "trending for " + pkg + " failed", e);
             return false;   // no network, or a bad key: the logos stay, and it asks again later
         }
     }
