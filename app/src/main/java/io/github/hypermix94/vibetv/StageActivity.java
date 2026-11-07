@@ -1250,10 +1250,12 @@ public class StageActivity extends Activity {
         ControlPanel() {
             bar = new LinearLayout(StageActivity.this);
             bar.setGravity(Gravity.CENTER_VERTICAL);
-            bar.setPadding(d(7), 0, d(7), 0);
+            bar.setPadding(d(12), 0, d(12), 0);   // room at both ends for a lit button and its ring
+            bar.setClipChildren(false);
+            bar.setClipToPadding(false);
             GradientDrawable pill = new GradientDrawable();
             pill.setColor(0x73282A30);
-            pill.setCornerRadius(d(32));
+            pill.setCornerRadius(d(35));
             pill.setStroke(Math.max(1, d(1)), 0x21FFFFFF);
             bar.setBackground(pill);
             LayoutTransition lt = new LayoutTransition();
@@ -1289,7 +1291,7 @@ public class StageActivity extends Activity {
             LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(d(50), d(50));
             mlp.leftMargin = d(22);
             bar.addView(me, mlp);
-            root.addView(bar, at(-2, d(64), Gravity.TOP | Gravity.END, 0, 60, 80, 0));
+            root.addView(bar, at(-2, d(70), Gravity.TOP | Gravity.END, 0, 57, 80, 0));
 
             card = new FrameLayout(StageActivity.this);
             GradientDrawable glass = new GradientDrawable();
