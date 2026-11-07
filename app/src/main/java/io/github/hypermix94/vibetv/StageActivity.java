@@ -50,8 +50,6 @@ public class StageActivity extends Activity {
     private static final int[] HIG = {260, 260, 260, 260, 260, 260, 260, 217, 184, 160};
     private static final int VISIBLE = 9, GAP = 40, TRAY_BOTTOM = 980, LEFT = 80;
     private static final float FOCUS_SCALE = 1.14f;
-    /** The "Not on Home" tile's stand-in package name: not a real app. */
-    private static final String LIBRARY = "stage.library";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private float s;
@@ -155,19 +153,13 @@ public class StageActivity extends Activity {
 
     private void loadApps() {
         Map<String, App> all = Apps.all(this);
-        java.util.Set<String> hidden = Apps.hidden(this);
         boolean unset = Apps.dockOrder(this).isEmpty();
         for (String pkg : Apps.dockOrder(this)) {
             App a = all.remove(pkg);
             if (a != null && dock.size() < Apps.MAX_DOCK) dock.add(a);
         }
-        for (App a : all.values()) if (!hidden.contains(a.pkg)) others.add(a);
+        others.addAll(all.values());   // every app is on Home: the grid holds all that are not on the tray
         while (unset && dock.size() < 6 && !others.isEmpty()) dock.add(others.remove(0));
-        // Apps taken off Home are one tile away: the last tile of the grid opens their list.
-        if (!hidden.isEmpty()) {
-            others.add(new App(LIBRARY, "Not on Home", new Intent(this, LibraryActivity.class),
-                    null, getDrawable(R.drawable.ic_apps_more)));
-        }
     }
 
     private void open(App a) {
@@ -986,17 +978,15 @@ public class StageActivity extends Activity {
 
     private void openMenu() {
         App a = focused();
-        if (a == null || a.pkg.equals(LIBRARY)) return;
+        if (a == null) return;
         boolean inTray = zone == Zone.TRAY;
         String remove = Apps.removeAction(this, a.pkg);
         String[] items = inTray
-                ? new String[]{"Move", "Remove from dock", "Remove from Home", "App info", remove}
-                : new String[]{"Add to dock", "Remove from Home", "App info", remove};
+                ? new String[]{"Move", "Remove from dock", "App info", remove}
+                : new String[]{"Add to dock", "App info", remove};
         int[] icons = inTray
-                ? new int[]{R.drawable.ic_menu_move, R.drawable.ic_menu_dock_remove, R.drawable.ic_menu_hide,
-                        R.drawable.ic_menu_info, R.drawable.ic_menu_delete}
-                : new int[]{R.drawable.ic_menu_dock_add, R.drawable.ic_menu_hide, R.drawable.ic_menu_info,
-                        R.drawable.ic_menu_delete};
+                ? new int[]{R.drawable.ic_menu_move, R.drawable.ic_menu_dock_remove, R.drawable.ic_menu_info, R.drawable.ic_menu_delete}
+                : new int[]{R.drawable.ic_menu_dock_add, R.drawable.ic_menu_info, R.drawable.ic_menu_delete};
         if (remove == null) {
             items = java.util.Arrays.copyOf(items, items.length - 1);
             icons = java.util.Arrays.copyOf(icons, icons.length - 1);
@@ -1031,10 +1021,6 @@ public class StageActivity extends Activity {
             case "Remove from dock":
                 Apps.removeFromDock(this, a.pkg);
                 fold(trayTiles.get(at), this::recreate);
-                break;
-            case "Remove from Home":
-                Apps.setHidden(this, a.pkg, true);
-                fold(zone == Zone.TRAY ? trayTiles.get(at) : gridTiles.get(g), this::recreate);
                 break;
             case "App info":
                 startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
@@ -1094,7 +1080,6 @@ public class StageActivity extends Activity {
         shown.addAll(others);
         for (int i = 0; i < shown.size(); i++) {
             App a = shown.get(i);
-            if (a.pkg.equals(LIBRARY)) continue;
             if (getPackageManager().getLaunchIntentForPackage(a.pkg) != null
                     || getPackageManager().getLeanbackLaunchIntentForPackage(a.pkg) != null) continue;
             View t = i < dock.size() ? trayTiles.get(i) : gridTiles.get(i - dock.size());
