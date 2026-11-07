@@ -69,7 +69,7 @@ STEP 5 - Build and install
 STEP 6 - Make it Home
 - Ask me to press Home on the remote and pick Stage, and to choose "Always" if asked.
   If the TV offers no choice, run, after telling me:
-  adb shell cmd package set-home-activity io.github.hypermix94.vibetv/.HomeActivity
+  adb shell cmd package set-home-activity io.github.hypermix94.vibetv/.StageActivity
 - Check it worked: adb shell dumpsys activity activities | grep -m1 mFocusedApp should name
   io.github.hypermix94.vibetv. Take a screenshot (adb exec-out screencap -p > stage-home.png) and tell me what
   is on it, or show it to me if you can.

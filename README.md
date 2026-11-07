@@ -142,7 +142,7 @@ and an Android TV or Google TV with network debugging switched on.
 4. **Make it Home.** Press Home on the remote and pick Stage, or run:
 
    ```bash
-   adb -s 192.168.1.50:5555 shell cmd package set-home-activity io.github.hypermix94.vibetv/.HomeActivity
+   adb -s 192.168.1.50:5555 shell cmd package set-home-activity io.github.hypermix94.vibetv/.StageActivity
    ```
 
 5. **Switch network debugging off** on the TV when you are done.
