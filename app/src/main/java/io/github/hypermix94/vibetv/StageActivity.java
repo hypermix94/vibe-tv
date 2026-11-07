@@ -258,6 +258,9 @@ public class StageActivity extends Activity {
         line = Cards.text(this, s, 29, R.font.outfit_regular, 0xD9FFFFFF);
         LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(-2, -2);
         lineLp.topMargin = d(4);
+        // A soft shadow keeps the words readable over bright artwork (a yellow cartoon, a white sky).
+        title.setShadowLayer(d(24), 0, d(2), 0x99000000);
+        line.setShadowLayer(d(12), 0, d(1), 0xB3000000);
         words.addView(title);
         words.addView(line, lineLp);
         page.addView(words, at(d(1100), -2, Gravity.TOP | Gravity.START, LEFT, 72, 0, 0));

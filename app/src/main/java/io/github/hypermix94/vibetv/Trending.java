@@ -43,7 +43,7 @@ final class Trending {
     static {
         PROVIDERS.put("com.netflix.ninja", "8");
         PROVIDERS.put("com.amazon.amazonvideo.livingroom", "119");
-        PROVIDERS.put("in.startv.hotstar", "122|2336");
+        PROVIDERS.put("in.startv.hotstar", "2336");
         PROVIDERS.put("com.graymatrix.did", "232");
         PROVIDERS.put("com.suntv.sunnxt", "309");
     }
@@ -92,11 +92,18 @@ final class Trending {
         try {
             String region = java.util.Locale.getDefault().getCountry();
             if (region.isEmpty()) region = "IN";
+            // "Trending" means new: series with an episode in the last two months, films from the last six months
+            // (most popular across the whole catalogue brings up shows from years ago).
+            java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT);
+            long now = System.currentTimeMillis();
+            String series = "&air_date.gte=" + day.format(new java.util.Date(now - 60L * 86_400_000L));
+            String films = "&primary_release_date.gte=" + day.format(new java.util.Date(now - 180L * 86_400_000L));
             List<JSONObject> found = new ArrayList<>();
             for (String kind : new String[]{"tv", "movie"}) {
                 JSONObject r = new JSONObject(get(c, "https://api.themoviedb.org/3/discover/" + kind
                         + "?watch_region=" + region + "&with_watch_providers=" + PROVIDERS.get(pkg).replace("|", "%7C")
-                        + "&with_watch_monetization_types=flatrate&sort_by=popularity.desc&page=1&api_key="
+                        + "&with_watch_monetization_types=flatrate&sort_by=popularity.desc&page=1"
+                        + (kind.equals("tv") ? series : films) + "&api_key="
                         + c.getString(R.string.tmdb_key)));
                 JSONArray a = r.getJSONArray("results");
                 for (int i = 0; i < a.length(); i++) {
