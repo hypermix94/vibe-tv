@@ -1216,7 +1216,7 @@ public class StageActivity extends Activity {
      * the remote's keys do) and Brightness (Sony's picture brightness lives in its Picture settings, which it opens).
      */
     private final class ControlPanel {
-        private static final int CLOCK = 0, TIMER = 1, CONTROLS = 2, ME = 3, PARTY = 4, W = 600, PAD = 24;
+        private static final int CLOCK = 0, TIMER = 1, CONTROLS = 2, ME = 3, PARTY = 4, ASSIST = 5, W = 600, PAD = 24;
         private static final int WIFI = 0, INPUTS = 1, SPEAKERS = 2, VOLUME = 3, H = 409;   // H: the panel's inner height
         private final LinearLayout bar;
         private final TextView clock;
@@ -1225,6 +1225,8 @@ public class StageActivity extends Activity {
         private final TextView me;
         /** Party mode: the music screen with the lights on, or the last music app when nothing plays. */
         private final ImageView partyButton;
+        /** Google Assistant, as the remote's microphone button opens it. */
+        private final ImageView assistButton;
         private final FrameLayout card;
         private final FrameLayout[] views = new FrameLayout[3];
         private final List<FrameLayout> keys = new ArrayList<>();
@@ -1282,6 +1284,13 @@ public class StageActivity extends Activity {
                 v.setVisibility(View.GONE);   // at rest only the time and your picture show
                 mods.add(v);
             }
+            assistButton = new ImageView(StageActivity.this);
+            assistButton.setImageResource(R.drawable.ic_mic);
+            assistButton.setPadding(d(12), d(12), d(12), d(12));
+            assistButton.setContentDescription("Google Assistant");
+            LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(d(50), d(50));
+            alp.leftMargin = d(4);
+            bar.addView(assistButton, alp);
             partyButton = new ImageView(StageActivity.this);
             partyButton.setImageResource(R.drawable.ic_cc_party);
             partyButton.setPadding(d(11), d(11), d(11), d(11));
@@ -1601,14 +1610,14 @@ public class StageActivity extends Activity {
         /** Moves within the panel; Left and Right on Volume turn it instead. */
         boolean move(int dx, int dy) {
             if (inBar) {   // the bar: the time, a running timer, party mode and you; the controls are under them all
-                List<Integer> order = new ArrayList<>(java.util.Arrays.asList(CLOCK, TIMER, PARTY, ME));
+                List<Integer> order = new ArrayList<>(java.util.Arrays.asList(CLOCK, TIMER, ASSIST, PARTY, ME));
                 if (!timerOn()) order.remove((Integer) TIMER);
                 int at = Math.max(0, order.indexOf(m));
                 if (dx != 0) {
                     m = order.get(Math.max(0, Math.min(order.size() - 1, at + dx)));
                 } else if (dy > 0) {   // Down: into the time or timer card, or to the controls
                     inBar = false;
-                    if (m == ME || m == PARTY) {
+                    if (m == ME || m == PARTY || m == ASSIST) {
                         m = CONTROLS;
                         q = 0;
                     }
@@ -1654,6 +1663,13 @@ public class StageActivity extends Activity {
             if (inBar) {
                 if (m == ME) startActivity(new Intent(StageActivity.this, SettingsActivity.class));   // your picture: Home settings
                 else if (m == PARTY) party();
+                else if (m == ASSIST) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_ASSIST).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    } catch (RuntimeException ignored) {
+                        // no assistant on this TV
+                    }
+                }
                 else if (m < CONTROLS) inBar = false;   // into the time or timer card
                 StageActivity.this.paint(true);
                 return;
@@ -1793,13 +1809,8 @@ public class StageActivity extends Activity {
                 else ((TextView) v).setTextColor(lit ? 0xFF111111 : Color.WHITE);
                 v.animate().scaleX(lit ? 1.1f : 1f).scaleY(lit ? 1.1f : 1f).setDuration(300).setInterpolator(SPRING).start();
             }
-            boolean partyLit = on && inBar && m == PARTY;
-            GradientDrawable pbg = new GradientDrawable();
-            pbg.setShape(GradientDrawable.OVAL);
-            pbg.setColor(partyLit ? Color.WHITE : 0x00000000);
-            partyButton.setBackground(pbg);
-            partyButton.setImageTintList(ColorStateList.valueOf(partyLit ? 0xFF111111 : 0xD9FFFFFF));
-            partyButton.animate().scaleX(partyLit ? 1.12f : 1f).scaleY(partyLit ? 1.12f : 1f).setDuration(300).setInterpolator(SPRING).start();
+            light(partyButton, on && inBar && m == PARTY);
+            light(assistButton, on && inBar && m == ASSIST);
             boolean meOn = on && inBar && m == ME;
             me.animate().scaleX(meOn ? 1.15f : 1f).scaleY(meOn ? 1.15f : 1f).setDuration(300).setInterpolator(SPRING).start();
             me.setForeground(meOn ? ring() : null);
@@ -1818,6 +1829,16 @@ public class StageActivity extends Activity {
                 k.setElevation(kf ? d(16) : 0);
                 k.animate().scaleX(kf ? 1.05f : 1f).scaleY(kf ? 1.05f : 1f).setDuration(animate ? 350 : 0).setInterpolator(SPRING).start();
             }
+        }
+
+        /** A round button in the bar: white with a dark icon when the remote is on it. */
+        private void light(ImageView b, boolean lit) {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setShape(GradientDrawable.OVAL);
+            bg.setColor(lit ? Color.WHITE : 0x00000000);
+            b.setBackground(bg);
+            b.setImageTintList(ColorStateList.valueOf(lit ? 0xFF111111 : 0xD9FFFFFF));
+            b.animate().scaleX(lit ? 1.12f : 1f).scaleY(lit ? 1.12f : 1f).setDuration(300).setInterpolator(SPRING).start();
         }
 
         private void tint(View v, int colour) {
