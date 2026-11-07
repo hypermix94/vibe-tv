@@ -50,7 +50,7 @@ final class Scenery {
     private static final long LIST_AGE_MS = 7L * 24 * 60 * 60 * 1000;
     private static final int KEEP = 16;
     private static final String API = "https://commons.wikimedia.org/w/api.php?format=json&action=query";
-    private static final String AGENT = "vibe-tv/1.0 (Android TV screensaver; https://github.com/hypermix94/vibe-tv)";
+    private static final String AGENT = "Stage/1.0 (Android TV screensaver; https://github.com/hypermix94/vibe-tv)";
 
     private final File dir;
     private final Random random = new Random();

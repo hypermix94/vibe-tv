@@ -31,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * vibe-tv's settings: your name, the weather city, the screensaver delay, the dock and the Apps grid, the clock's
+ * Stage's settings: your name, the weather city, the screensaver delay, the dock and the Apps grid, the clock's
  * seconds, the greeting character and the All apps preview panel. Up and Down pick a setting; Left and Right change a
  * choice or switch one on and off; OK types into a text setting with the on-screen keyboard. Changes apply at once
  * and the home screen rebuilds with them.

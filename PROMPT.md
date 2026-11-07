@@ -1,8 +1,8 @@
-# 🤖 Install vibe-tv with an AI agent
+# 🤖 Install Stage with an AI agent
 
 Copy the prompt below into a coding agent that can run commands on your computer (Claude Code, Codex, Gemini CLI,
 Cursor and the like), on a Mac or Linux computer on the same network as the TV. The agent sets up what is missing,
-builds vibe-tv from this repository, installs it on your TV and makes it your home screen, asking you before
+builds Stage from this repository, installs it on your TV and makes it your home screen, asking you before
 anything you would want a say in.
 
 Before you start, switch on network debugging on the TV:
@@ -18,7 +18,7 @@ Keep the remote close: the first time the computer connects, the TV asks you to 
 ## The prompt
 
 ```text
-Install vibe-tv (https://github.com/hypermix94/vibe-tv), an open-source home screen for Android TV and Google TV,
+Install Stage (https://github.com/hypermix94/vibe-tv), an open-source home screen for Android TV and Google TV,
 on my TV, and make it my home screen. Work on this computer, over the network, with adb. Follow these steps in
 order, and these rules throughout.
 
@@ -47,7 +47,7 @@ STEP 2 - Get the code
 STEP 3 - Connect
 - adb connect <tv ip>:5555. Tell me to look at the TV and allow this computer, then wait for me.
 - adb -s <tv ip>:5555 shell getprop ro.build.version.sdk must be 26 or higher (Android 8). If it is lower, stop:
-  vibe-tv will not run on this TV.
+  Stage will not run on this TV.
 - Tell me the TV model and Android version you found (getprop ro.product.model, ro.build.version.release).
 
 STEP 4 - Make it mine
@@ -57,8 +57,8 @@ Ask me these together, in one message, and say each one is optional and can be c
 - Which apps go on the dock. List the apps installed on the TV for me to choose from:
   adb shell pm list packages -3   (plus the TV's own apps I might want, like Live TV)
   Show them by their names where you can tell them, with the package name in brackets.
-Write my answers into local.properties in the repository, as README.md shows (vibetv.name, vibetv.weatherPlace,
-vibetv.weatherLatitude, vibetv.weatherLongitude, vibetv.dock). Look up the city's latitude and longitude yourself.
+Write my answers into local.properties in the repository, as README.md shows (stage.name, stage.weatherPlace,
+stage.weatherLatitude, stage.weatherLongitude, stage.dock). Look up the city's latitude and longitude yourself.
 
 STEP 5 - Build and install
 - Run: TV_HOST=<tv ip> ./install.sh
@@ -67,11 +67,11 @@ STEP 5 - Build and install
 - If the build fails, read the error, fix the setup on this computer (not the app's code), and try once more.
 
 STEP 6 - Make it Home
-- Ask me to press Home on the remote and pick vibe-tv, and to choose "Always" if asked.
+- Ask me to press Home on the remote and pick Stage, and to choose "Always" if asked.
   If the TV offers no choice, run, after telling me:
   adb shell cmd package set-home-activity io.github.hypermix94.vibetv/.HomeActivity
 - Check it worked: adb shell dumpsys activity activities | grep -m1 mFocusedApp should name
-  io.github.hypermix94.vibetv. Take a screenshot (adb exec-out screencap -p > vibe-tv-home.png) and tell me what
+  io.github.hypermix94.vibetv. Take a screenshot (adb exec-out screencap -p > stage-home.png) and tell me what
   is on it, or show it to me if you can.
 - Do NOT disable the TV's own home screen. If it keeps coming back, tell me, and explain the choice: leaving it
   as it is, or disabling it with pm disable-user (never uninstall), which I can undo any time with pm enable.
@@ -90,10 +90,10 @@ STEP 7 - Hand over
 
 - **The TV refuses the connection.** Network debugging is off, or switched itself off after a restart. Switch it on
   again and run the prompt from step 3.
-- **Home goes back to the TV's own screen.** Press Home and pick vibe-tv again with Always, or ask the agent to set
+- **Home goes back to the TV's own screen.** Press Home and pick Stage again with Always, or ask the agent to set
   it with `cmd package set-home-activity`.
-- **An app is missing from the tiles.** vibe-tv lists the apps you installed and the TV's own Live TV, Settings and
+- **An app is missing from the tiles.** Stage lists the apps you installed and the TV's own Live TV, Settings and
   Play Store; a preinstalled app shows once it has been updated from the Play Store.
-- **The screensaver shows the TV's own one.** Run `./install.sh` again; it sets vibe-tv as the screensaver.
+- **The screensaver shows the TV's own one.** Run `./install.sh` again; it sets Stage as the screensaver.
 
-vibe-tv is a vibe-coded project, built with Claude Opus 5.5. It is shared as it is, under the MIT licence.
+Stage is a vibe-coded project, built with Claude Opus 5.5. It is shared as it is, under the MIT licence.

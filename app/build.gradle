@@ -14,21 +14,21 @@ android {
         versionName '1.0'
 
         // The screensaver's weather place, from local.properties (never committed), e.g.
-        //   vibetv.weatherPlace=London
-        //   vibetv.weatherLatitude=51.5072
-        //   vibetv.weatherLongitude=-0.1276
+        //   stage.weatherPlace=London
+        //   stage.weatherLatitude=51.5072
+        //   stage.weatherLongitude=-0.1276
         // Left out: no weather.
         def local = new Properties()
         def localFile = rootProject.file('local.properties')
         if (localFile.exists()) localFile.withInputStream { local.load(it) }
         // The owner's name for the greeting, and the dock's apps (package names, comma-separated), e.g.
-        //   vibetv.name=Alex
-        //   vibetv.dock=com.netflix.ninja,com.google.android.youtube.tv
-        resValue 'string', 'owner_name', local.getProperty('vibetv.name', '')
-        resValue 'string', 'dock_apps', local.getProperty('vibetv.dock', '')
-        resValue 'string', 'weather_place', local.getProperty('vibetv.weatherPlace', '')
-        resValue 'string', 'weather_latitude', local.getProperty('vibetv.weatherLatitude', '')
-        resValue 'string', 'weather_longitude', local.getProperty('vibetv.weatherLongitude', '')
+        //   stage.name=Alex
+        //   stage.dock=com.netflix.ninja,com.google.android.youtube.tv
+        resValue 'string', 'owner_name', local.getProperty('stage.name', local.getProperty('vibetv.name', ''))
+        resValue 'string', 'dock_apps', local.getProperty('stage.dock', local.getProperty('vibetv.dock', ''))
+        resValue 'string', 'weather_place', local.getProperty('stage.weatherPlace', local.getProperty('vibetv.weatherPlace', ''))
+        resValue 'string', 'weather_latitude', local.getProperty('stage.weatherLatitude', local.getProperty('vibetv.weatherLatitude', ''))
+        resValue 'string', 'weather_longitude', local.getProperty('stage.weatherLongitude', local.getProperty('vibetv.weatherLongitude', ''))
     }
 
     buildTypes {
@@ -40,6 +40,10 @@ android {
             signingConfig signingConfigs.debug
         }
     }
+
+    // Your own app logos, shown large on the home screen: local-logos/logos/<package>.jpg or .png, white or
+    // coloured on black. Brands' logos are theirs, so the folder is never committed; without it, each app's banner.
+    sourceSets.main.assets.srcDirs += rootProject.file('local-logos')
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

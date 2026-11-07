@@ -1,4 +1,4 @@
-<h1 align="center">vibe-tv</h1>
+<h1 align="center">Stage</h1>
 
 <p align="center"><b>A home screen and screensaver for Android TV that play along with your music.</b><br>
 No ads, no account, nothing to sign in to. Made by Hypermix. 🎶📺<br>
@@ -83,7 +83,7 @@ The TV does not turn itself off.
 
 ## ⚙️ Home settings
 
-Open **Home settings** from the Apps row or All apps. It is named so it is not confused with the TV's own Settings.
+Open **Home settings** from your initial at the top right: press Up, then Right to it, then OK. It is named so it is not confused with the TV's own Settings.
 
 | Setting | What it does |
 |---|---|
@@ -117,11 +117,11 @@ and an Android TV or Google TV with network debugging switched on.
    also be changed later in Home settings.
 
    ```properties
-   vibetv.name=Alex
-   vibetv.weatherPlace=London
-   vibetv.weatherLatitude=51.5072
-   vibetv.weatherLongitude=-0.1276
-   vibetv.dock=com.netflix.ninja,com.google.android.youtube.tv,com.spotify.tv.android
+   stage.name=Alex
+   stage.weatherPlace=London
+   stage.weatherLatitude=51.5072
+   stage.weatherLongitude=-0.1276
+   stage.dock=com.netflix.ninja,com.google.android.youtube.tv,com.spotify.tv.android
    ```
 
 3. **Build and install:**
@@ -130,10 +130,10 @@ and an Android TV or Google TV with network debugging switched on.
    TV_HOST=192.168.1.50 ./install.sh
    ```
 
-   Use your TV's address. The first time, the TV asks you to allow this computer. The script installs vibe-tv,
+   Use your TV's address. The first time, the TV asks you to allow this computer. The script installs Stage,
    makes it the screensaver and gives it the permissions below.
 
-4. **Make it Home.** Press Home on the remote and pick vibe-tv, or run:
+4. **Make it Home.** Press Home on the remote and pick Stage, or run:
 
    ```bash
    adb -s 192.168.1.50:5555 shell cmd package set-home-activity io.github.hypermix94.vibetv/.HomeActivity

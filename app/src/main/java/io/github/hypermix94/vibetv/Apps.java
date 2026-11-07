@@ -51,7 +51,7 @@ final class Apps {
             for (ResolveInfo r : pm.queryIntentActivities(q, 0)) {
                 ActivityInfo a = r.activityInfo;
                 boolean mine = a.packageName.equals(c.getPackageName());
-                if ((mine && !a.name.endsWith(".SettingsActivity")) || found.containsKey(a.packageName)) continue;   // our Settings shows
+                if (mine || found.containsKey(a.packageName)) continue;   // Home settings opens from your picture, not a tile
                 if (!mine && !wanted(a.applicationInfo)) continue;   // factory utilities stay out of sight
                 Intent launch = new Intent(Intent.ACTION_MAIN).addCategory(category)
                         .setClassName(a.packageName, a.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -84,7 +84,7 @@ final class Apps {
     /**
      * What the hold-OK menu offers for getting rid of an app: "Uninstall" for one you installed; "Disable" for one
      * that came with the TV (YouTube on Google TV, say), which Android cannot uninstall, only switch off; null for the
-     * TV's own Settings, Play Store and live TV, which the TV needs, and for vibe-tv itself.
+     * TV's own Settings, Play Store and live TV, which the TV needs, and for Stage itself.
      */
     static String removeAction(Context c, String pkg) {
         if (pkg.equals(c.getPackageName())) return null;

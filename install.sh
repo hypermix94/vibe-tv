@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build vibe-tv and install it on an Android TV over the network, then make it the screensaver.
+# Build Stage and install it on an Android TV over the network, then make it the screensaver.
 #   TV_HOST=<tv ip> ./install.sh
 # Needs JDK 17 and the Android SDK (platform 34, build-tools 34, platform-tools for adb), and network debugging
 # switched on on the TV. The first connection asks you to allow this computer on the TV screen.
@@ -29,7 +29,7 @@ TV settings put system screen_off_timeout 120000
 TV cmd notification allow_listener "$PKG/$PKG.NowPlayingListener"
 TV pm grant "$PKG" android.permission.RECORD_AUDIO
 TV pm grant "$PKG" android.permission.WRITE_SECURE_SETTINGS
-echo "vibe-tv installed and set as the screensaver."
+echo "Stage installed and set as the screensaver."
 # Settings can change the screensaver delay; All apps can show each app's size.
 TV appops set "$PKG" WRITE_SETTINGS allow
 TV appops set "$PKG" GET_USAGE_STATS allow

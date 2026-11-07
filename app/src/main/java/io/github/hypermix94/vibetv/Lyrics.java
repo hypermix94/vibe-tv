@@ -194,7 +194,7 @@ final class Lyrics {
                 http = (HttpURLConnection) new URL(url).openConnection();
                 http.setConnectTimeout(8000);
                 http.setReadTimeout(10000);
-                http.setRequestProperty("User-Agent", "vibe-tv (https://github.com/hypermix94/vibe-tv)");
+                http.setRequestProperty("User-Agent", "Stage (https://github.com/hypermix94/vibe-tv)");
                 int status = http.getResponseCode();
                 if (status == 404) return "";
                 if (status == 200) {

@@ -75,7 +75,7 @@
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
         </activity>
 
-        <!-- vibe-tv's settings, listed among the apps. -->
+        <!-- Stage's settings, listed among the apps. -->
         <activity
             android:name=".SettingsActivity"
             android:exported="true"

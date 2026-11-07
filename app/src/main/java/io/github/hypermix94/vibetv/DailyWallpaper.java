@@ -24,7 +24,7 @@ import java.util.Locale;
  * Runs on a background thread.
  */
 final class DailyWallpaper {
-    private static final String AGENT = "vibe-tv/1.0 (Android TV home screen; https://github.com/hypermix94/vibe-tv)";
+    private static final String AGENT = "Stage/1.0 (Android TV home screen; https://github.com/hypermix94/vibe-tv)";
     private static final int KEEP = 3;
 
     /** The picture and its credit line. */

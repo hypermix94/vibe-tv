@@ -4,7 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 /**
- * vibe-tv's settings, as the Settings screen sets them. Each falls back to the build's own value (local.properties)
+ * Stage's settings, as the Settings screen sets them. Each falls back to the build's own value (local.properties)
  * or a sensible default until someone changes it.
  */
 final class Prefs {

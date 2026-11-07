@@ -362,6 +362,7 @@ public class StageActivity extends Activity {
         String said = NowPlaying.loadTitle(this, a.pkg);
         new Thread(() -> {
             Bitmap art = NowPlaying.loadArt(this, a.pkg);
+            Bitmap logo = art == null ? ownLogo(a.pkg) : null;
             boolean light = art == null && a.banner != null && luminance(colourOf(a)) > 0.7f;
             Bitmap mark = light ? cutOut(a.banner, colourOf(a)) : art == null && a.banner != null ? feather(a.banner) : null;
             main.post(() -> {
@@ -373,7 +374,13 @@ public class StageActivity extends Activity {
                 f.setColorFilter(null);
                 if (Build.VERSION.SDK_INT >= 31) f.setRenderEffect(null);
                 boolean plain = art == null;
-                if (!plain) {
+                if (plain && logo != null) {   // your own logo for the app, on black, never past its own size
+                    p.setImageBitmap(logo);
+                    p.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    float w = Math.min(860, logo.getWidth() / s), h = w * logo.getHeight() / logo.getWidth();
+                    p.setPadding(d(960 - w / 2), d(380 - h / 2), d(960 - w / 2), d(1080 - 380 - h / 2));
+                    f.setBackgroundColor(Color.BLACK);
+                } else if (!plain) {
                     p.setImageBitmap(art);
                     p.setScaleType(ImageView.ScaleType.CENTER_CROP);
                     p.setPadding(0, 0, 0, 0);
@@ -453,6 +460,18 @@ public class StageActivity extends Activity {
         }
         b.setPixels(px, 0, w, 0, 0, w, h);
         return b;
+    }
+
+    /** Your own logo for an app, from local-logos (see app/build.gradle), or null. */
+    private Bitmap ownLogo(String pkg) {
+        for (String ext : new String[]{".png", ".jpg"}) {
+            try (java.io.InputStream in = getAssets().open("logos/" + pkg + ext)) {
+                return android.graphics.BitmapFactory.decodeStream(in);
+            } catch (java.io.IOException ignored) {
+                // not this one
+            }
+        }
+        return null;
     }
 
     /** A banner whose edges fade out, so it melts into its own colours spread across the screen behind it. */
@@ -1042,8 +1061,20 @@ public class StageActivity extends Activity {
             if (!t.contentEquals(clock.getText())) clock.setText(t);
         }
 
+        /** The timer shows in the bar only while one runs. */
+        private boolean timerOn() {
+            return Clocks.timer() != null;
+        }
+
         void tick() {
             if (timerBig == null) return;
+            if (shown && (mods.get(2).getVisibility() == View.VISIBLE) != timerOn()) {   // a timer started or ended
+                if (m == 2 && !timerOn()) {
+                    m = CONTROLS;
+                    inBar = true;
+                }
+                StageActivity.this.paint(true);
+            }
             String l = Clocks.line(StageActivity.this);
             timerBig.setText(l != null && l.startsWith("Timer · ") ? l.substring(8) : "0:00");
             TextView sub = (TextView) ((LinearLayout) timerBig.getParent()).getChildAt(1);
@@ -1059,8 +1090,8 @@ public class StageActivity extends Activity {
         /** Moves within the panel; false when the remote leaves it (it closes). */
         boolean move(int dx, int dy) {
             if (inBar) {
-                if (dx > 0 && m < ME) m++;
-                else if (dx < 0 && m > 0) m--;
+                if (dx > 0 && m < ME) m += m + 1 == 2 && !timerOn() ? 2 : 1;
+                else if (dx < 0 && m > 0) m -= m - 1 == 2 && !timerOn() ? 2 : 1;
                 else if (dy > 0 && m < ME) {
                     inBar = false;
                     q = 0;
@@ -1151,7 +1182,7 @@ public class StageActivity extends Activity {
             if (on != shown) {
                 shown = on;
                 // The bar stretches out to the left; the panel unfolds from under its right end.
-                for (int i = 1; i < mods.size(); i++) mods.get(i).setVisibility(on ? View.VISIBLE : View.GONE);
+                for (int i = 1; i < mods.size(); i++) mods.get(i).setVisibility(on && (i != 2 || timerOn()) ? View.VISIBLE : View.GONE);
                 ((GradientDrawable) bar.getBackground()).setColor(on ? 0x8C464A52 : 0x73282A30);
                 card.setPivotX(d(W) * 0.92f);
                 card.setPivotY(0);
@@ -1176,6 +1207,7 @@ public class StageActivity extends Activity {
                             .withEndAction(() -> card.setVisibility(View.INVISIBLE)).start();
                 }
             }
+            if (shown) mods.get(2).setVisibility(timerOn() ? View.VISIBLE : View.GONE);
             for (int i = 0; i < 4; i++) views[i].setVisibility(i == Math.min(m, CONTROLS) ? View.VISIBLE : View.GONE);
             for (int i = 0; i < mods.size(); i++) {
                 ImageView v = mods.get(i);
