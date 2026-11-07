@@ -21,6 +21,7 @@ import android.view.View;
 final class PartyView extends View {
     private static final long SWAP_MS = 1400L;       // the crossfade when the colours move on: slow, like stage lights
     private static final long BEAT_GAP_MS = 3000L;   // the shortest time between two colour changes
+    private static final long DRIFT_MS = 6000L;      // without a strong beat, the colours still move on this often
     private static final long FLASH_MS = 260L;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -47,6 +48,13 @@ final class PartyView extends View {
             float[] c = new float[3];
             Color.colorToHSV(cover[i % cover.length], c);
             if (i >= cover.length) c[0] = (c[0] + 50f * (i - cover.length + 1)) % 360f;
+            // Colours too alike to tell apart (a cover all in oranges, say) are spread around the wheel instead.
+            for (int j = 0; j < i; j++) {
+                float[] o = new float[3];
+                Color.colorToHSV(p[j], o);
+                float gap = Math.abs(o[0] - c[0]);
+                if (Math.min(gap, 360f - gap) < 40f) c[0] = (o[0] + 75f) % 360f;
+            }
             c[1] = Math.max(0.55f, c[1]);
             c[2] = 1f;
             p[i] = Color.HSVToColor(c);
@@ -119,6 +127,12 @@ final class PartyView extends View {
 
         float w = getWidth(), h = getHeight(), cx = w / 2f, cy = h * 0.42f;
         int n = palette.length;
+        if (now - lastBeat > DRIFT_MS) {   // a quiet song still moves on, slowly
+            lastBeat = now;
+            previous = lead;
+            lead = (lead + 1) % palette.length;
+            swapStart = now;
+        }
         float swap = Math.min(1f, (now - swapStart) / (float) SWAP_MS);
         swap = swap * swap * (3 - 2 * swap);
         float flash = Math.max(0f, 1f - (now - flashStart) / (float) FLASH_MS);
