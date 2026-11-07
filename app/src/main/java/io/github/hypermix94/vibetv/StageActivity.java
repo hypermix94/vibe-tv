@@ -625,6 +625,7 @@ public class StageActivity extends Activity {
                 String what = item != null ? "Trending on " + android.text.TextUtils.htmlEncode(a.label)
                         : nowTitle != null ? "Playing now · " + android.text.TextUtils.htmlEncode(nowTitle)
                         : said.isEmpty() ? lastOpened(a.pkg) : "Last played " + android.text.TextUtils.htmlEncode(said);
+                line.setVisibility(item != null ? View.GONE : View.VISIBLE);   // a trending title stands alone
                 line.setText(android.text.Html.fromHtml(bigName ? what
                         : "<b>" + android.text.TextUtils.htmlEncode(a.label) + "</b> · " + what, android.text.Html.FROM_HTML_MODE_LEGACY));
                 if (hot.size() > 1) main.postDelayed(nextSlide, SLIDE_MS - System.currentTimeMillis() % SLIDE_MS + 50);   // the clock's next tick

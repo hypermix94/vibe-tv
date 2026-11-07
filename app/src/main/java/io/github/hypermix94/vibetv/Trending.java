@@ -80,6 +80,9 @@ final class Trending {
         return BitmapFactory.decodeFile(f.getAbsolutePath());
     }
 
+    /** Apps whose trending shows films only (ZEE5's series are mostly daily soaps). */
+    private static final java.util.Set<String> MOVIES_ONLY = new java.util.HashSet<>(java.util.Arrays.asList("com.graymatrix.did"));
+
     private static final long KEEP_MS = 6 * 3600_000L, RETRY_MS = 15 * 60_000L;
     private static final int MAX = 8;
 
@@ -95,7 +98,7 @@ final class Trending {
     }
 
     private static SharedPreferences prefs(Context c) {
-        return c.getSharedPreferences("trending3", Context.MODE_PRIVATE);
+        return c.getSharedPreferences("trending4", Context.MODE_PRIVATE);
     }
 
     /** The last list for an app, whose pictures are on disk; empty before the first answer. */
@@ -133,7 +136,7 @@ final class Trending {
             String series = "&air_date.gte=" + day.format(new java.util.Date(now - 60L * 86_400_000L));
             String films = "&primary_release_date.gte=" + day.format(new java.util.Date(now - 180L * 86_400_000L));
             List<JSONObject> found = new ArrayList<>();
-            for (String kind : new String[]{"tv", "movie"}) {
+            for (String kind : MOVIES_ONLY.contains(pkg) ? new String[]{"movie"} : new String[]{"tv", "movie"}) {
                 JSONObject r = new JSONObject(get(c, "https://api.themoviedb.org/3/discover/" + kind
                         + "?watch_region=" + region + "&with_watch_providers=" + PROVIDERS.get(pkg).replace("|", "%7C")
                         + "&with_watch_monetization_types=flatrate&sort_by=popularity.desc&page=1"
