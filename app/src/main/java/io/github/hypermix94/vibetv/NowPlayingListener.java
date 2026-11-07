@@ -117,13 +117,15 @@ public class NowPlayingListener extends NotificationListenerService {
         try {
             android.content.ContentResolver cr = getContentResolver();
             int now = android.provider.Settings.System.getInt(cr, android.provider.Settings.System.SCREEN_OFF_TIMEOUT, 600_000);
-            android.content.SharedPreferences p = getSharedPreferences("music_timeout", MODE_PRIVATE);
+            android.content.SharedPreferences p = getSharedPreferences("music_timeout_v2", MODE_PRIVATE);
             boolean music = MusicScreen.playingMusic(this) != null;
+            if (!music && now != MUSIC_TIMEOUT_MS && p.contains("usual")) p.edit().remove("usual").apply();   // you set your own
             if (music && now != MUSIC_TIMEOUT_MS) {
                 p.edit().putInt("usual", now).apply();
                 android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_OFF_TIMEOUT, MUSIC_TIMEOUT_MS);
-            } else if (!music && now == MUSIC_TIMEOUT_MS) {
-                android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_OFF_TIMEOUT, p.getInt("usual", 600_000));
+            } else if (!music && now == MUSIC_TIMEOUT_MS && p.contains("usual")) {
+                android.provider.Settings.System.putInt(cr, android.provider.Settings.System.SCREEN_OFF_TIMEOUT, p.getInt("usual", now));
+                p.edit().remove("usual").apply();
             }
         } catch (RuntimeException ignored) {
             // no permission to change the delay: the TV's own stays

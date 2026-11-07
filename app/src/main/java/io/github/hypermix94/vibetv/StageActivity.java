@@ -1299,6 +1299,8 @@ public class StageActivity extends Activity {
             card.setBackground(glass);
             card.setElevation(d(30));
             card.setPadding(d(PAD), d(PAD), d(PAD), d(PAD));
+            card.setClipToPadding(false);   // a focused control grows into the margin, never cut
+            card.setClipChildren(false);
             card.setAlpha(0f);
             card.setVisibility(View.INVISIBLE);
             root.addView(card, at(d(W), d(552 + 2 * PAD), Gravity.TOP | Gravity.END, 0, 140, 80, 0));
