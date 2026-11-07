@@ -122,7 +122,8 @@ final class Trending {
                 if (keep.length() >= MAX) break;
                 String path = o.getString("backdrop_path");
                 File f = new File(dir, path.replaceAll("[^A-Za-z0-9.]", ""));
-                if (!f.exists()) {
+                if (f.exists()) f.setLastModified(now);   // still trending: keep it
+                else {
                     byte[] img = bytes("https://image.tmdb.org/t/p/w1280" + path);
                     try (FileOutputStream out = new FileOutputStream(f)) {
                         out.write(img);
@@ -133,6 +134,12 @@ final class Trending {
             }
             if (keep.length() == 0) return false;
             p.edit().putString(pkg, keep.toString()).putBoolean("ok_" + pkg, true).apply();
+            // Pictures of titles that have dropped out: gone after three days, so the cache never keeps growing
+            // (every list refreshes well within that, and a picture still in use is touched again when kept).
+            File[] old = dir.listFiles();
+            for (int i = 0; old != null && i < old.length; i++) {
+                if (now - old[i].lastModified() > 3 * 86_400_000L && !keep.toString().contains(old[i].getName())) old[i].delete();
+            }
             return true;
         } catch (Exception e) {
             return false;   // no network, or a bad key: the logos stay, and it asks again later
@@ -151,7 +158,8 @@ final class Trending {
                 String path = logos.getJSONObject(i).getString("file_path");
                 if (!path.endsWith(".png")) continue;   // SVG logos cannot be drawn here
                 File f = new File(dir, "logo" + path.replaceAll("[^A-Za-z0-9.]", ""));
-                if (!f.exists()) {
+                if (f.exists()) f.setLastModified(System.currentTimeMillis());
+                else {
                     byte[] img = bytes("https://image.tmdb.org/t/p/w500" + path);
                     try (FileOutputStream out = new FileOutputStream(f)) {
                         out.write(img);
