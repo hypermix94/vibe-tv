@@ -411,9 +411,9 @@ public class StageActivity extends Activity {
                 if (plain && logo != null) {   // your own logo for the app, on black, never past its own size
                     p.setImageBitmap(logo);
                     p.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    // Below and right of the name, clear of it and of the tray.
+                    // Centred in the space between the name's line (ends near 280) and the tray (starts near 770).
                     float w = Math.min(720, logo.getWidth() / s), h = w * logo.getHeight() / logo.getWidth();
-                    p.setPadding(d(1110 - w / 2), d(480 - h / 2), d(1920 - 1110 - w / 2), d(1080 - 480 - h / 2));
+                    p.setPadding(d(1110 - w / 2), d(525 - h / 2), d(1920 - 1110 - w / 2), d(1080 - 525 - h / 2));
                     f.setBackgroundColor(Color.BLACK);
                 } else if (!plain && art.getWidth() < art.getHeight() * 1.3f) {
                     // A square cover: large on the right, over itself spread and softened across the screen.
@@ -436,7 +436,7 @@ public class StageActivity extends Activity {
                     p.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     // The banner large but not past twice its size, centred above the tray; the icon smaller.
                     int w = a.banner != null ? 640 : 240, h = Math.round(w * (a.banner != null ? 0.5625f : 1f));
-                    int cx = 1110, cy = 480;
+                    int cx = 1110, cy = 525;
                     p.setPadding(d(cx - w / 2f), d(cy - h / 2f), d(1920 - cx - w / 2f), d(1080 - cy - h / 2f));
                     f.setBackgroundColor(a.banner != null && !light ? colourOf(a) : 0xFF0E0E10);
                     if (a.banner != null && !light && Build.VERSION.SDK_INT >= 31) {
