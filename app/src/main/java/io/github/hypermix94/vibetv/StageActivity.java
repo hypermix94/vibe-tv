@@ -1216,13 +1216,15 @@ public class StageActivity extends Activity {
      * the remote's keys do) and Brightness (Sony's picture brightness lives in its Picture settings, which it opens).
      */
     private final class ControlPanel {
-        private static final int CLOCK = 0, TIMER = 1, CONTROLS = 2, ME = 3, W = 600, PAD = 24;
+        private static final int CLOCK = 0, TIMER = 1, CONTROLS = 2, ME = 3, PARTY = 4, W = 600, PAD = 24;
         private static final int WIFI = 0, INPUTS = 1, SPEAKERS = 2, VOLUME = 3, H = 409;   // H: the panel's inner height
         private final LinearLayout bar;
         private final TextView clock;
         /** The bar's modules in order: the time, the timer, the controls (your picture is {@link #me}). */
         private final List<View> mods = new ArrayList<>();
         private final TextView me;
+        /** Party mode: the music screen with the lights on, or the last music app when nothing plays. */
+        private final ImageView partyButton;
         private final FrameLayout card;
         private final FrameLayout[] views = new FrameLayout[3];
         private final List<FrameLayout> keys = new ArrayList<>();
@@ -1280,6 +1282,13 @@ public class StageActivity extends Activity {
                 v.setVisibility(View.GONE);   // at rest only the time and your picture show
                 mods.add(v);
             }
+            partyButton = new ImageView(StageActivity.this);
+            partyButton.setImageResource(R.drawable.ic_cc_party);
+            partyButton.setPadding(d(11), d(11), d(11), d(11));
+            partyButton.setContentDescription("Party mode");
+            LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(d(50), d(50));
+            plp.leftMargin = d(20);
+            bar.addView(partyButton, plp);
             me = Cards.text(StageActivity.this, s, 24, R.font.outfit_medium, Color.WHITE);
             me.setGravity(Gravity.CENTER);
             String name = Prefs.name(StageActivity.this).trim();
@@ -1591,14 +1600,15 @@ public class StageActivity extends Activity {
 
         /** Moves within the panel; Left and Right on Volume turn it instead. */
         boolean move(int dx, int dy) {
-            if (inBar) {   // the bar: the time, a running timer, and you; the controls are under them all
-                if (dx > 0 && m == CLOCK) m = timerOn() ? TIMER : ME;
-                else if (dx > 0 && m == TIMER) m = ME;
-                else if (dx < 0 && m == ME) m = timerOn() ? TIMER : CLOCK;
-                else if (dx < 0 && m == TIMER) m = CLOCK;
-                else if (dy > 0) {   // Down: into the time or timer card, or from you to the controls
+            if (inBar) {   // the bar: the time, a running timer, party mode and you; the controls are under them all
+                List<Integer> order = new ArrayList<>(java.util.Arrays.asList(CLOCK, TIMER, PARTY, ME));
+                if (!timerOn()) order.remove((Integer) TIMER);
+                int at = Math.max(0, order.indexOf(m));
+                if (dx != 0) {
+                    m = order.get(Math.max(0, Math.min(order.size() - 1, at + dx)));
+                } else if (dy > 0) {   // Down: into the time or timer card, or to the controls
                     inBar = false;
-                    if (m == ME) {
+                    if (m == ME || m == PARTY) {
                         m = CONTROLS;
                         q = 0;
                     }
@@ -1643,6 +1653,7 @@ public class StageActivity extends Activity {
         void press() {
             if (inBar) {
                 if (m == ME) startActivity(new Intent(StageActivity.this, SettingsActivity.class));   // your picture: Home settings
+                else if (m == PARTY) party();
                 else if (m < CONTROLS) inBar = false;   // into the time or timer card
                 StageActivity.this.paint(true);
                 return;
@@ -1664,6 +1675,31 @@ public class StageActivity extends Activity {
             } catch (RuntimeException e) {
                 // no such page on this TV
             }
+        }
+
+        /**
+         * Party mode: with music playing, the music screen opens with the lights on; with none, the music app last
+         * played opens, to start a song.
+         */
+        private void party() {
+            if (MusicScreen.playingMusic(StageActivity.this) != null) {
+                startActivity(new Intent(StageActivity.this, PartyActivity.class));
+                return;
+            }
+            String last = null;
+            long when = -1;
+            for (String pkg : MusicScreen.MUSIC_APPS) {
+                if (getPackageManager().getLaunchIntentForPackage(pkg) == null && getPackageManager().getLeanbackLaunchIntentForPackage(pkg) == null) continue;
+                long t = NowPlaying.artTime(StageActivity.this, pkg);
+                if (t > when) {
+                    when = t;
+                    last = pkg;
+                }
+            }
+            if (last == null) return;
+            Intent open = getPackageManager().getLeanbackLaunchIntentForPackage(last);
+            if (open == null) open = getPackageManager().getLaunchIntentForPackage(last);
+            startActivity(open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         }
 
         /**
@@ -1757,6 +1793,13 @@ public class StageActivity extends Activity {
                 else ((TextView) v).setTextColor(lit ? 0xFF111111 : Color.WHITE);
                 v.animate().scaleX(lit ? 1.1f : 1f).scaleY(lit ? 1.1f : 1f).setDuration(300).setInterpolator(SPRING).start();
             }
+            boolean partyLit = on && inBar && m == PARTY;
+            GradientDrawable pbg = new GradientDrawable();
+            pbg.setShape(GradientDrawable.OVAL);
+            pbg.setColor(partyLit ? Color.WHITE : 0x00000000);
+            partyButton.setBackground(pbg);
+            partyButton.setImageTintList(ColorStateList.valueOf(partyLit ? 0xFF111111 : 0xD9FFFFFF));
+            partyButton.animate().scaleX(partyLit ? 1.12f : 1f).scaleY(partyLit ? 1.12f : 1f).setDuration(300).setInterpolator(SPRING).start();
             boolean meOn = on && inBar && m == ME;
             me.animate().scaleX(meOn ? 1.15f : 1f).scaleY(meOn ? 1.15f : 1f).setDuration(300).setInterpolator(SPRING).start();
             me.setForeground(meOn ? ring() : null);

@@ -531,6 +531,11 @@ final class MusicScreen extends android.content.ContextWrapper {
 
     // ---- party mode -------------------------------------------------------------------------------
 
+    /** Opens in party mode (the control panel's party button), once the screen has settled. */
+    void startParty() {
+        main.postDelayed(() -> { if (!partyOn) setPartyOn(true); }, 600);
+    }
+
     /** Party mode: the disco lights fade in over the background and start listening to the music. */
     private void setPartyOn(boolean on) {
         // The cover swells out past its place on the beat: nothing around it may cut it off.

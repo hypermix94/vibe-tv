@@ -96,6 +96,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Party mode on demand: the music screen with the lights on, from the control panel. -->
+        <activity
+            android:name=".PartyActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
         <!-- "Not on Home": the apps taken off the home screen. -->
         <activity
             android:name=".LibraryActivity"
