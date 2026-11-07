@@ -59,7 +59,7 @@ public class StageActivity extends Activity {
     private int picOn;
     private View veil, chevron;
     private TextView title, line, gridName;
-    private LinearLayout words;
+    private LinearLayout words, dots;
     private final List<App> dock = new ArrayList<>(), others = new ArrayList<>();
     private final List<FrameLayout> trayTiles = new ArrayList<>(), gridTiles = new ArrayList<>();
     private int cols, tw, th, gridTop, first;
@@ -229,8 +229,11 @@ public class StageActivity extends Activity {
             stage.addView(pics[i], match());
         }
         veil = new View(this);
-        veil.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0x59000000, 0x00000000, 0x00000000, 0x73000000, 0xB3000000}));
+        // Soft shades so the name at the top left and the tray read on any picture.
+        veil.setBackground(new android.graphics.drawable.LayerDrawable(new Drawable[]{
+                new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                        new int[]{0x59000000, 0x00000000, 0x00000000, 0x73000000, 0xB3000000}),
+                new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{0x66000000, 0x00000000, 0x00000000})}));
         root.addView(veil, match());
 
         page = new FrameLayout(this);
@@ -247,7 +250,7 @@ public class StageActivity extends Activity {
         words = new LinearLayout(this);
         words.setOrientation(LinearLayout.VERTICAL);
         words.setClipChildren(false);
-        title = Cards.text(this, s, 120, R.font.outfit_medium, Color.WHITE);
+        title = Cards.text(this, s, 112, R.font.outfit_medium, Color.WHITE);
         title.setLetterSpacing(-0.03f);
         title.setSingleLine(true);
         title.setPadding(d(16), d(8), d(16), d(8));
@@ -257,8 +260,11 @@ public class StageActivity extends Activity {
         lineLp.topMargin = d(4);
         words.addView(title);
         words.addView(line, lineLp);
-        page.addView(words, at(d(1500), -2, Gravity.TOP | Gravity.START, LEFT, 0, 0, 0));
-        words.setTranslationY(d(trayTop - 230));
+        page.addView(words, at(d(1100), -2, Gravity.TOP | Gravity.START, LEFT, 72, 0, 0));
+        // Which trending title shows: small dots above the tray, on the right.
+        dots = new LinearLayout(this);
+        dots.setGravity(Gravity.CENTER);
+        page.addView(dots, at(-2, d(12), Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, trayTop - 40, 0, 0));
         words.setTag("rise:120");
 
         // The tray: frosted glass low over the picture, with the favourites on it.
@@ -324,7 +330,7 @@ public class StageActivity extends Activity {
         ImageView img = new ImageView(this);
         if (a.banner != null) {
             img.setImageDrawable(a.banner);
-            img.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            img.setScaleType(ImageView.ScaleType.CENTER_CROP);   // a 16:9 banner fills the 5:3 tile, no bars
             t.addView(img, match());
         } else {
             img.setImageDrawable(a.icon);
@@ -405,9 +411,20 @@ public class StageActivity extends Activity {
                 if (plain && logo != null) {   // your own logo for the app, on black, never past its own size
                     p.setImageBitmap(logo);
                     p.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    float w = Math.min(860, logo.getWidth() / s), h = w * logo.getHeight() / logo.getWidth();
-                    p.setPadding(d(960 - w / 2), d(380 - h / 2), d(960 - w / 2), d(1080 - 380 - h / 2));
+                    // Below and right of the name, clear of it and of the tray.
+                    float w = Math.min(720, logo.getWidth() / s), h = w * logo.getHeight() / logo.getWidth();
+                    p.setPadding(d(1110 - w / 2), d(480 - h / 2), d(1920 - 1110 - w / 2), d(1080 - 480 - h / 2));
                     f.setBackgroundColor(Color.BLACK);
+                } else if (!plain && art.getWidth() < art.getHeight() * 1.3f) {
+                    // A square cover: large on the right, over itself spread and softened across the screen.
+                    p.setImageBitmap(art);
+                    p.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    p.setPadding(d(1240), d(150), d(80), d(1080 - 150 - 600));   // between the time pill and the tray, flush with the tray's right
+                    p.setClipToOutline(false);
+                    f.setBackgroundColor(Color.BLACK);
+                    f.setImageBitmap(art);
+                    f.setColorFilter(0x8C000000, android.graphics.PorterDuff.Mode.SRC_ATOP);
+                    if (Build.VERSION.SDK_INT >= 31) f.setRenderEffect(RenderEffect.createBlurEffect(d(80), d(80), Shader.TileMode.CLAMP));
                 } else if (!plain) {
                     p.setImageBitmap(art);
                     p.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -419,7 +436,7 @@ public class StageActivity extends Activity {
                     p.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     // The banner large but not past twice its size, centred above the tray; the icon smaller.
                     int w = a.banner != null ? 640 : 240, h = Math.round(w * (a.banner != null ? 0.5625f : 1f));
-                    int cx = 960, cy = 380;
+                    int cx = 1110, cy = 480;
                     p.setPadding(d(cx - w / 2f), d(cy - h / 2f), d(1920 - cx - w / 2f), d(1080 - cy - h / 2f));
                     f.setBackgroundColor(a.banner != null && !light ? colourOf(a) : 0xFF0E0E10);
                     if (a.banner != null && !light && Build.VERSION.SDK_INT >= 31) {
@@ -435,8 +452,8 @@ public class StageActivity extends Activity {
                 fills[picOn].animate().alpha(0f).setDuration(ms).start();
                 picOn = next;
                 veil.animate().alpha(plain ? 0.6f : 1f).setDuration(ms).start();
-                // The name shows large over a picture; over the app's own logo or banner, small in the line under it.
-                boolean bigName = !plain;
+                // The name, large at the top left for every app, as on Apple TV; the line under it says what is on.
+                boolean bigName = true;
                 title.setText(item != null ? item.title : a.label);
                 title.setVisibility(bigName ? View.VISIBLE : View.GONE);
                 String what = item != null ? "Trending on " + android.text.TextUtils.htmlEncode(a.label) + " · from TMDB"
@@ -444,6 +461,17 @@ public class StageActivity extends Activity {
                 line.setText(android.text.Html.fromHtml(bigName ? what
                         : "<b>" + android.text.TextUtils.htmlEncode(a.label) + "</b> · " + what, android.text.Html.FROM_HTML_MODE_LEGACY));
                 if (hot.size() > 1) main.postDelayed(nextSlide, 6000);
+                dots.removeAllViews();
+                for (int i = 0; item != null && hot.size() > 1 && i < hot.size(); i++) {
+                    View dot = new View(this);
+                    GradientDrawable g = new GradientDrawable();
+                    g.setCornerRadius(d(6));
+                    g.setColor(i == slide % hot.size() ? Color.WHITE : 0x59FFFFFF);
+                    dot.setBackground(g);
+                    LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(d(i == slide % hot.size() ? 36 : 12), d(12));
+                    dl.leftMargin = dl.rightMargin = d(5);
+                    dots.addView(dot, dl);
+                }
                 if (animate) {
                     words.setAlpha(0f);
                     words.animate().alpha(zone == Zone.TRAY ? 1f : 0f).setDuration(500).start();
@@ -675,6 +703,7 @@ public class StageActivity extends Activity {
         }
         gridName.animate().alpha(inGrid ? 1f : 0f).setDuration(animate ? 300 : 0).start();
         words.animate().alpha(zone == Zone.TRAY ? 1f : 0f).setDuration(animate ? 400 : 0).start();
+        dots.animate().alpha(zone == Zone.TRAY ? 1f : 0f).setDuration(animate ? 400 : 0).start();
         chevron.animate().alpha(zone == Zone.TRAY ? 0.85f : 0f).setDuration(animate ? 400 : 0).start();
         View stage = (View) pics[0].getParent();
         stage.animate().scaleX(inGrid ? 1.08f : 1f).scaleY(inGrid ? 1.08f : 1f).alpha(inGrid ? 0.5f : 1f)
