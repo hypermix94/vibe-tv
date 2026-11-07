@@ -167,7 +167,6 @@ final class MusicScreen extends android.content.ContextWrapper {
         playing.registerCallback(callback);
         show(playing.getMetadata());
         keepAwake(true);
-        main.postDelayed(() -> { if (!partyOn) setPartyOn(true); }, 900);   // the music screen opens as a party
         return screen;
     }
 
